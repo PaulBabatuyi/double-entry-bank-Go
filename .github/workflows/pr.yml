@@ -1,0 +1,23 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+
+jobs:
+  pr-checks:
+    name: PR Build Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Build
+        run: go build ./...

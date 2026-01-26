@@ -1,0 +1,17 @@
+# Ignore files for Render deployment
+.git
+.github
+.vscode
+.env
+.env.example
+*.md
+!README.md
+*.exe
+idea.exe
+phase.exe
+devops.exe
+run_tests.bat
+run_tests.sh
+scripts/
+coverage.out
+.golangci.yml

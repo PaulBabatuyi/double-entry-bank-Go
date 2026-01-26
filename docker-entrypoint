@@ -1,0 +1,97 @@
+#!/bin/sh
+
+set -eu
+
+resolve_db_url() {
+    db_url="${DB_URL:-}"
+
+    if [ -z "$db_url" ]; then
+        for candidate in INTERNAL_DATABASE_URL RENDER_DATABASE_URL DATABASE_URL; do
+            eval value="\${$candidate:-}"
+            if [ -n "$value" ]; then
+                db_url="$value"
+                break
+            fi
+        done
+    fi
+
+    case "$db_url" in
+        *@localhost:*|*@127.0.0.1:*|*@\[::1\]:*)
+            for candidate in INTERNAL_DATABASE_URL RENDER_DATABASE_URL DATABASE_URL; do
+                eval value="\${$candidate:-}"
+                if [ -n "$value" ]; then
+                    db_url="$value"
+                    break
+                fi
+            done
+            ;;
+    esac
+
+    echo "$db_url"
+}
+
+if [ "${RUN_DB_MIGRATIONS_ON_START:-true}" != "true" ]; then
+    echo "RUN_DB_MIGRATIONS_ON_START is not 'true'; skipping migrations"
+else
+    db_url="$(resolve_db_url)"
+fi
+
+if [ "${RUN_DB_MIGRATIONS_ON_START:-true}" = "true" ] && [ -n "${db_url:-}" ]; then
+    echo "Running database migrations..."
+
+    # golang-migrate expects postgres:// (not postgresql://)
+    migrate_db_url="$db_url"
+    case "$migrate_db_url" in
+        postgresql://*)
+            migrate_db_url="postgres://${migrate_db_url#postgresql://}"
+            ;;
+    esac
+
+    max_attempts=12
+    attempt=1
+    migration_status=1
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        set +e
+        migration_output=$(migrate -path /app/postgres/migrations -database "$migrate_db_url" up 2>&1)
+        migration_status=$?
+        set -e
+
+        echo "$migration_output"
+
+        if [ "$migration_status" -eq 0 ] || echo "$migration_output" | grep -qi "no change"; then
+            break
+        fi
+
+        if ! echo "$migration_output" | grep -qi "connection refused\|timeout\|no route to host\|network is unreachable\|temporary failure"; then
+            echo "Migration failed"
+            exit "$migration_status"
+        fi
+
+        if [ "$attempt" -lt "$max_attempts" ]; then
+            echo "Database not ready yet; retrying migrations ($attempt/$max_attempts)..."
+            sleep 5
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
+    if [ "$migration_status" -ne 0 ] && ! echo "$migration_output" | grep -qi "no change"; then
+        echo "Migration failed"
+        exit "$migration_status"
+    fi
+elif [ "${RUN_DB_MIGRATIONS_ON_START:-true}" = "true" ]; then
+    if [ "${RENDER:-}" = "true" ]; then
+        echo "ERROR: DB_URL is not set on this Render service."
+        echo "Fix: Render dashboard → your web service → Environment → add DB_URL"
+        echo "     set to the Internal Connection String from your PostgreSQL service."
+    else
+        echo "DB_URL not set; skipping migrations"
+    fi
+fi
+
+if [ -n "${db_url:-}" ] && [ -z "${DB_URL:-}" ]; then
+    export DB_URL="$db_url"
+fi
+
+exec /usr/local/bin/ledger
