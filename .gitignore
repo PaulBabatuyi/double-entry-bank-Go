@@ -13,3 +13,5 @@ go.work
 
 # Docker
 .env
+
+*.py
