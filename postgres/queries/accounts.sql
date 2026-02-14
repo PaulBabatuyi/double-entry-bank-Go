@@ -17,3 +17,8 @@ ORDER BY created_at DESC;
 UPDATE accounts
 SET balance = balance + $1
 WHERE id = $2;
+
+-- name: GetSettlementAccount :one
+SELECT * FROM accounts
+WHERE is_system = TRUE AND name = 'Settlement Account'
+LIMIT 1;

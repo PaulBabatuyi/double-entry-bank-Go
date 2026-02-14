@@ -65,6 +65,27 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 	return i, err
 }
 
+const getSettlementAccount = `-- name: GetSettlementAccount :one
+SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts
+WHERE is_system = TRUE AND name = 'Settlement Account'
+LIMIT 1
+`
+
+func (q *Queries) GetSettlementAccount(ctx context.Context) (Account, error) {
+	row := q.db.QueryRowContext(ctx, getSettlementAccount)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerID,
+		&i.Name,
+		&i.Balance,
+		&i.Currency,
+		&i.IsSystem,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listAccountsByOwner = `-- name: ListAccountsByOwner :many
 SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts
 WHERE owner_id = $1
