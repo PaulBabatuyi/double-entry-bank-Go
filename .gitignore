@@ -15,3 +15,5 @@ go.work
 .env
 
 *.py
+./internal/service/ledger_test.go
+*_test.go
