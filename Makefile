@@ -11,7 +11,6 @@ migrate-up:
 
 migrate-down:
 	migrate -path postgres/migrations/ -database "postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable" -verbose down
-
 sqlc:
 	sqlc generate   
 
@@ -19,4 +18,4 @@ test:
 	go test -v ./...
 
 server:
-	go run cmd/server/main.go
+	go run cmd/main.go
