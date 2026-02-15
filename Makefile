@@ -1,4 +1,4 @@
-.PHONY: postgres createdb migrate-up migrate-down sqlc test server
+.PHONY: postgres createdb migrate-up migrate-down sqlc test server lint test coverage
 
 postgres:
 	docker compose up -d
@@ -19,3 +19,13 @@ test:
 
 server:
 	go run cmd/main.go
+
+lint:
+	golangci-lint run
+
+test:
+	go test -v -race ./...
+
+coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out
