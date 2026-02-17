@@ -79,7 +79,7 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 			return err
 		}
 
-		// 3. Update balances (using decimal)
+		// 3. Update balances
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
 			Balance: amount.StringFixed(4),
 			ID:      accountID,
@@ -116,12 +116,12 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 	return s.store.ExecTx(ctx, func(q *sqlc.Queries) error {
 		settlement, err := q.GetSettlementAccountForUpdate(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("settlement account not found: %w", err)
 		}
 
 		account, err := q.GetAccountForUpdate(ctx, accountID)
 		if err != nil {
-			return err
+			return fmt.Errorf("account not found: %w", err)
 		}
 
 		if account.Currency != settlement.Currency {
@@ -290,14 +290,30 @@ func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUI
 		return false, fmt.Errorf("account not found: %w", err)
 	}
 
-	calculatedRaw, err := s.store.Queries.GetAccountBalance(ctx, accountID)
+	// Use GetCalculatedBalance which returns interface{} containing the NUMERIC value
+	calculatedRaw, err := s.store.Queries.GetCalculatedBalance(ctx, accountID)
 	if err != nil {
 		return false, fmt.Errorf("failed to calculate balance: %w", err)
 	}
 
-	// GetAccountBalance returns int32 (sqlc inferred from SUM),
-	// convert to decimal for precise comparison with stored NUMERIC balance.
-	calculated := decimal.NewFromInt32(calculatedRaw)
+	var calculatedStr string
+	switch v := calculatedRaw.(type) {
+	case []byte:
+		calculatedStr = string(v)
+	case string:
+		calculatedStr = v
+	case int64:
+		calculatedStr = fmt.Sprintf("%d.0000", v)
+	case float64:
+		calculatedStr = fmt.Sprintf("%.4f", v)
+	default:
+		return false, fmt.Errorf("unexpected calculated balance type: %T", calculatedRaw)
+	}
+
+	calculated, err := decimal.NewFromString(calculatedStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid calculated balance: %w", err)
+	}
 
 	stored, err := decimal.NewFromString(account.Balance)
 	if err != nil {

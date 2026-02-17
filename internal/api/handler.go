@@ -32,7 +32,7 @@ func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 }
 
 func respondError(w http.ResponseWriter, status int, msg string) {
-	respondJSON(w, status, map[string]string{"error": msg})
+	respondJSON(w, status, ErrorResponse{Error: msg})
 }
 
 // Register godoc
@@ -83,10 +83,10 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusCreated, map[string]interface{}{
-		"user_id": user.ID,
-		"email":   user.Email,
-		"token":   token,
+	respondJSON(w, http.StatusCreated, RegisterResponse{
+		UserID: user.ID.String(),
+		Email:  user.Email,
+		Token:  token,
 	})
 }
 
@@ -129,7 +129,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"token": token})
+	respondJSON(w, http.StatusOK, TokenResponse{Token: token})
 }
 
 // CreateAccount godoc
@@ -173,7 +173,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusCreated, acc)
+	respondJSON(w, http.StatusCreated, toAccountResponse(acc))
 }
 
 // ListAccounts godoc
@@ -197,7 +197,12 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, accounts)
+	response := make([]AccountResponse, len(accounts))
+	for i, acc := range accounts {
+		response[i] = toAccountResponse(acc)
+	}
+
+	respondJSON(w, http.StatusOK, response)
 }
 
 // GetAccount godoc
@@ -209,10 +214,15 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 // @Success      200  {object}  AccountResponse
 // @Failure      400  {object}  ErrorResponse
 // @Failure      401  {object}  ErrorResponse
+// @Failure      403  {object}  ErrorResponse
 // @Failure      404  {object}  ErrorResponse
 // @Router       /accounts/{id} [get]
 // @Security     Bearer
 func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	userIDStr, _ := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
 	accountIDStr := chi.URLParam(r, "id")
 	accountID, err := uuid.Parse(accountIDStr)
 	if err != nil {
@@ -226,7 +236,12 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, acc)
+	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		respondError(w, http.StatusForbidden, "access denied")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, toAccountResponse(acc))
 }
 
 // Deposit godoc
@@ -240,12 +255,27 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 // @Success      200     {object}  MessageResponse
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
+// @Failure      403     {object}  ErrorResponse
 // @Router       /accounts/{id}/deposit [post]
 // @Security     Bearer
 func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	userIDStr, _ := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
 	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid account ID")
+		return
+	}
+
+	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "account not found")
+		return
+	}
+	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
 
@@ -269,7 +299,7 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"message": "deposit successful"})
+	respondJSON(w, http.StatusOK, MessageResponse{Message: "deposit successful"})
 }
 
 // Withdraw godoc
@@ -283,12 +313,27 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 // @Success      200     {object}  MessageResponse
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
+// @Failure      403     {object}  ErrorResponse
 // @Router       /accounts/{id}/withdraw [post]
 // @Security     Bearer
 func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	userIDStr, _ := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
 	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid account ID")
+		return
+	}
+
+	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "account not found")
+		return
+	}
+	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
 
@@ -310,7 +355,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"message": "withdrawal successful"})
+	respondJSON(w, http.StatusOK, MessageResponse{Message: "withdrawal successful"})
 }
 
 // Transfer godoc
@@ -323,9 +368,14 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 // @Success      200     {object}  MessageResponse
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
+// @Failure      403     {object}  ErrorResponse
 // @Router       /transfers [post]
 // @Security     Bearer
 func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	userIDStr, _ := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
 	var input struct {
 		FromID uuid.UUID `json:"from_id"`
 		ToID   uuid.UUID `json:"to_id"`
@@ -336,13 +386,23 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.ledger.Transfer(r.Context(), input.FromID, input.ToID, input.Amount)
+	fromAcc, err := h.store.Queries.GetAccount(r.Context(), input.FromID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "from account not found")
+		return
+	}
+	if fromAcc.OwnerID.Valid && fromAcc.OwnerID.UUID != userID {
+		respondError(w, http.StatusForbidden, "access denied")
+		return
+	}
+
+	err = h.ledger.Transfer(r.Context(), input.FromID, input.ToID, input.Amount)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"message": "transfer successful"})
+	respondJSON(w, http.StatusOK, MessageResponse{Message: "transfer successful"})
 }
 
 // GetEntries godoc
@@ -356,13 +416,28 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 // @Success      200     {array}   EntryResponse
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
+// @Failure      403     {object}  ErrorResponse
 // @Failure      500     {object}  ErrorResponse
 // @Router       /accounts/{id}/entries [get]
 // @Security     Bearer
 func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	userIDStr, _ := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
 	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid account ID")
+		return
+	}
+
+	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "account not found")
+		return
+	}
+	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
 
@@ -389,7 +464,51 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, entries)
+	response := make([]EntryResponse, len(entries))
+	for i, entry := range entries {
+		response[i] = toEntryResponse(entry)
+	}
+
+	respondJSON(w, http.StatusOK, response)
+}
+
+// GetTransactions godoc
+// @Summary      Get transaction details
+// @Description  Returns both entries (debit and credit) for a complete transaction view
+// @Tags         accounts
+// @Produce      json
+// @Param        id   path      string  true  "Transaction ID"
+// @Success      200  {array}   EntryResponse
+// @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Router       /transactions/{id} [get]
+// @Security     Bearer
+func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
+	transactionIDStr := chi.URLParam(r, "id")
+	transactionID, err := uuid.Parse(transactionIDStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid transaction ID")
+		return
+	}
+
+	entries, err := h.store.Queries.ListEntriesByTransaction(r.Context(), transactionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to fetch transaction")
+		return
+	}
+
+	if len(entries) == 0 {
+		respondError(w, http.StatusNotFound, "transaction not found")
+		return
+	}
+
+	response := make([]EntryResponse, len(entries))
+	for i, entry := range entries {
+		response[i] = toEntryResponse(entry)
+	}
+
+	respondJSON(w, http.StatusOK, response)
 }
 
 // ReconcileAccount godoc
@@ -398,16 +517,31 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 // @Tags         accounts
 // @Produce      json
 // @Param        id   path      string  true  "Account ID"
-// @Success      200  {object}  EntryResponse
-// @Failure      400  {object}  map[string]string
-// @Failure      401  {object}  map[string]string
-// @Failure      500  {object}  map[string]string
+// @Success      200  {object}  ReconcileResponse
+// @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      403  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
 // @Router       /accounts/{id}/reconcile [get]
 // @Security     Bearer
 func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	userIDStr, _ := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
 	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid account ID")
+		return
+	}
+
+	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "account not found")
+		return
+	}
+	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
 
@@ -417,8 +551,44 @@ func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"matched": matched,
-		"message": "Account reconciled successfully",
+	respondJSON(w, http.StatusOK, ReconcileResponse{
+		Matched: matched,
+		Message: "Account reconciled successfully",
 	})
+}
+
+func toAccountResponse(acc sqlc.Account) AccountResponse {
+	var ownerID *string
+	if acc.OwnerID.Valid {
+		s := acc.OwnerID.UUID.String()
+		ownerID = &s
+	}
+
+	return AccountResponse{
+		ID:        acc.ID.String(),
+		OwnerID:   ownerID,
+		Name:      acc.Name,
+		Balance:   acc.Balance,
+		Currency:  acc.Currency,
+		IsSystem:  acc.IsSystem,
+		CreatedAt: acc.CreatedAt.Time,
+	}
+}
+
+func toEntryResponse(entry sqlc.Entry) EntryResponse {
+	var description string
+	if entry.Description.Valid {
+		description = entry.Description.String
+	}
+
+	return EntryResponse{
+		ID:            entry.ID.String(),
+		AccountID:     entry.AccountID.String(),
+		Debit:         entry.Debit,
+		Credit:        entry.Credit,
+		TransactionID: entry.TransactionID.String(),
+		OperationType: string(entry.OperationType),
+		Description:   description,
+		CreatedAt:     entry.CreatedAt.Time,
+	}
 }

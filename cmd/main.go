@@ -104,6 +104,7 @@ func main() {
 		r.Post("/transfers", h.Transfer)
 		r.Get("/accounts/{id}/entries", h.GetEntries)
 		r.Get("/accounts/{id}/reconcile", h.ReconcileAccount)
+		r.Get("/transactions/{id}", h.GetTransactions)
 	})
 
 	port := os.Getenv("PORT")
