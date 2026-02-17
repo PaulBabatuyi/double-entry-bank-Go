@@ -11,7 +11,6 @@ import (
 
 var (
 	TokenAuth *jwtauth.JWTAuth
-	jwtSecret = []byte("JWT_SECRET")
 )
 
 func init() {

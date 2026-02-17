@@ -37,6 +37,8 @@ func initLogger() {
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token
 func main() {
+	startTime := time.Now()
+
 	initLogger()
 
 	if err := godotenv.Load(); err != nil {
@@ -81,7 +83,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{
 			"status":  "healthy",
 			"version": "0.1.0",
-			"uptime":  time.Since(time.Now()).String(),
+			"uptime":  time.Since(startTime).String(),
 		})
 	})
 

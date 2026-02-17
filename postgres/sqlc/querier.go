@@ -15,8 +15,11 @@ type Querier interface {
 	CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
+	// lock prevents concurrent transactions from reading a stale balance.
+	GetAccountBalance(ctx context.Context, accountID uuid.UUID) (int32, error)
 	GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Account, error)
 	GetSettlementAccount(ctx context.Context) (Account, error)
+	GetSettlementAccountForUpdate(ctx context.Context) (Account, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	// locks row for update, prevents TOCTOU races
 	ListAccountsByOwner(ctx context.Context, ownerID uuid.NullUUID) ([]Account, error)

@@ -14,9 +14,6 @@ migrate-down:
 sqlc:
 	sqlc generate   
 
-test:
-	go test -v ./...
-
 server:
 	go run cmd/main.go
 

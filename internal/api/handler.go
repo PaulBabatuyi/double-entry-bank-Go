@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/db"
 	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/service"
@@ -365,8 +366,18 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
 	limit := 20
 	offset := 0
+
+	if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+		limit = min(v, 100)
+	}
+	if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
+		offset = v
+	}
 
 	entries, err := h.store.Queries.ListEntriesByAccount(r.Context(), sqlc.ListEntriesByAccountParams{
 		AccountID: accountID,
@@ -387,7 +398,7 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 // @Tags         accounts
 // @Produce      json
 // @Param        id   path      string  true  "Account ID"
-// @Success      200  {object}  object{matched=bool,message=string}
+// @Success      200  {object}  EntryResponse
 // @Failure      400  {object}  map[string]string
 // @Failure      401  {object}  map[string]string
 // @Failure      500  {object}  map[string]string
