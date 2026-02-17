@@ -65,6 +65,28 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 	return i, err
 }
 
+const getAccountForUpdate = `-- name: GetAccountForUpdate :one
+SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts
+WHERE id = $1
+LIMIT 1
+FOR UPDATE
+`
+
+func (q *Queries) GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Account, error) {
+	row := q.db.QueryRowContext(ctx, getAccountForUpdate, id)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerID,
+		&i.Name,
+		&i.Balance,
+		&i.Currency,
+		&i.IsSystem,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getSettlementAccount = `-- name: GetSettlementAccount :one
 SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts
 WHERE is_system = TRUE AND name = 'Settlement Account'
@@ -87,11 +109,13 @@ func (q *Queries) GetSettlementAccount(ctx context.Context) (Account, error) {
 }
 
 const listAccountsByOwner = `-- name: ListAccountsByOwner :many
+
 SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts
 WHERE owner_id = $1
 ORDER BY created_at DESC
 `
 
+// locks row for update, prevents TOCTOU races
 func (q *Queries) ListAccountsByOwner(ctx context.Context, ownerID uuid.NullUUID) ([]Account, error) {
 	rows, err := q.db.QueryContext(ctx, listAccountsByOwner, ownerID)
 	if err != nil {

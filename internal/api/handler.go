@@ -34,25 +34,6 @@ func respondError(w http.ResponseWriter, status int, msg string) {
 	respondJSON(w, status, map[string]string{"error": msg})
 }
 
-type RegisterResponse struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-	Token  string `json:"token"`
-}
-
-// swagger
-type TokenResponse struct {
-	Token string `json:"token"`
-}
-
-type MessageResponse struct {
-	Message string `json:"message"`
-}
-
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
 // Register godoc
 // @Summary      Register a new user
 // @Description  Creates a new user with email and hashed password, returns user details and JWT token
@@ -157,7 +138,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        body    body      object{name=string}  true  "Account details"
-// @Success      201     {object}  sqlc.Account
+// @Success      201     {object}  AccountResponse
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
 // @Failure      500     {object}  ErrorResponse
@@ -199,7 +180,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 // @Description  Returns list of accounts owned by authenticated user
 // @Tags         accounts
 // @Produce      json
-// @Success      200     {array}   sqlc.Account
+// @Success      200     {array}   AccountResponse
 // @Failure      401     {object}  ErrorResponse
 // @Failure      500     {object}  ErrorResponse
 // @Router       /accounts [get]
@@ -224,7 +205,7 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 // @Tags         accounts
 // @Produce      json
 // @Param        id   path      string  true  "Account ID"
-// @Success      200  {object}  sqlc.Account
+// @Success      200  {object}  AccountResponse
 // @Failure      400  {object}  ErrorResponse
 // @Failure      401  {object}  ErrorResponse
 // @Failure      404  {object}  ErrorResponse
@@ -371,7 +352,7 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 // @Param        id      path      string  true   "Account ID"
 // @Param        limit   query     int     false  "Limit (default 20)"
 // @Param        offset  query     int     false  "Offset (default 0)"
-// @Success      200     {array}   sqlc.Entry
+// @Success      200     {array}   EntryResponse
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
 // @Failure      500     {object}  ErrorResponse
@@ -398,4 +379,35 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, entries)
+}
+
+// ReconcileAccount godoc
+// @Summary      Reconcile account balance
+// @Description  Verifies stored balance matches sum of all ledger entries (credits - debits)
+// @Tags         accounts
+// @Produce      json
+// @Param        id   path      string  true  "Account ID"
+// @Success      200  {object}  object{matched=bool,message=string}
+// @Failure      400  {object}  map[string]string
+// @Failure      401  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
+// @Router       /accounts/{id}/reconcile [get]
+// @Security     Bearer
+func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
+	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid account ID")
+		return
+	}
+
+	matched, err := h.ledger.ReconcileAccount(r.Context(), accountID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"matched": matched,
+		"message": "Account reconciled successfully",
+	})
 }
