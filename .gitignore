@@ -9,7 +9,4 @@
 go.work
 
 .env
-
-./internal/service/ledger_test.go
-*_test.go
 correct.md

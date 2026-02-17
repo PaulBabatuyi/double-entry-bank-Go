@@ -28,3 +28,14 @@ WHERE id = $2;
 SELECT * FROM accounts
 WHERE is_system = TRUE AND name = 'Settlement Account'
 LIMIT 1;
+
+-- name: GetSettlementAccountForUpdate :one
+SELECT * FROM accounts
+WHERE is_system = TRUE AND name = 'Settlement Account'
+LIMIT 1
+FOR UPDATE; -- lock prevents concurrent transactions from reading a stale balance.
+
+-- name: GetAccountBalance :one
+SELECT COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS calculated_balance
+FROM entries
+WHERE account_id = $1;

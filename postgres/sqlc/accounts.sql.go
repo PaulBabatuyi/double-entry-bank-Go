@@ -65,6 +65,21 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 	return i, err
 }
 
+const getAccountBalance = `-- name: GetAccountBalance :one
+
+SELECT COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS calculated_balance
+FROM entries
+WHERE account_id = $1
+`
+
+// lock prevents concurrent transactions from reading a stale balance.
+func (q *Queries) GetAccountBalance(ctx context.Context, accountID uuid.UUID) (int32, error) {
+	row := q.db.QueryRowContext(ctx, getAccountBalance, accountID)
+	var calculated_balance int32
+	err := row.Scan(&calculated_balance)
+	return calculated_balance, err
+}
+
 const getAccountForUpdate = `-- name: GetAccountForUpdate :one
 SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts
 WHERE id = $1
@@ -95,6 +110,28 @@ LIMIT 1
 
 func (q *Queries) GetSettlementAccount(ctx context.Context) (Account, error) {
 	row := q.db.QueryRowContext(ctx, getSettlementAccount)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerID,
+		&i.Name,
+		&i.Balance,
+		&i.Currency,
+		&i.IsSystem,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getSettlementAccountForUpdate = `-- name: GetSettlementAccountForUpdate :one
+SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts
+WHERE is_system = TRUE AND name = 'Settlement Account'
+LIMIT 1
+FOR UPDATE
+`
+
+func (q *Queries) GetSettlementAccountForUpdate(ctx context.Context) (Account, error) {
+	row := q.db.QueryRowContext(ctx, getSettlementAccountForUpdate)
 	var i Account
 	err := row.Scan(
 		&i.ID,

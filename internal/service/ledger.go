@@ -37,7 +37,7 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 	}
 
 	return s.store.ExecTx(ctx, func(q *sqlc.Queries) error {
-		settlement, err := q.GetSettlementAccount(ctx)
+		settlement, err := q.GetSettlementAccountForUpdate(ctx)
 		if err != nil {
 			return fmt.Errorf("settlement account not found: %w", err)
 		}
@@ -114,7 +114,7 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 	}
 
 	return s.store.ExecTx(ctx, func(q *sqlc.Queries) error {
-		settlement, err := q.GetSettlementAccount(ctx)
+		settlement, err := q.GetSettlementAccountForUpdate(ctx)
 		if err != nil {
 			return err
 		}
@@ -283,28 +283,21 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 	})
 }
 
-// ReconcileAccount Reconcile  balance Verifies stored balance == SUM(credits) - SUM(debits)
+// ReconcileAccount verifies stored balance == SUM(credits) - SUM(debits)
 func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUID) (bool, error) {
 	account, err := s.store.Queries.GetAccount(ctx, accountID)
 	if err != nil {
 		return false, fmt.Errorf("account not found: %w", err)
 	}
 
-	entries, err := s.store.Queries.ListEntriesByAccount(ctx, sqlc.ListEntriesByAccountParams{
-		AccountID: accountID,
-		Limit:     0, // all entries (no limit)
-		Offset:    0,
-	})
+	calculatedRaw, err := s.store.Queries.GetAccountBalance(ctx, accountID)
 	if err != nil {
-		return false, fmt.Errorf("failed to fetch entries: %w", err)
+		return false, fmt.Errorf("failed to calculate balance: %w", err)
 	}
 
-	calculated := decimal.Zero
-	for _, entry := range entries {
-		debit, _ := decimal.NewFromString(entry.Debit)
-		credit, _ := decimal.NewFromString(entry.Credit)
-		calculated = calculated.Add(credit).Sub(debit)
-	}
+	// GetAccountBalance returns int32 (sqlc inferred from SUM),
+	// convert to decimal for precise comparison with stored NUMERIC balance.
+	calculated := decimal.NewFromInt32(calculatedRaw)
 
 	stored, err := decimal.NewFromString(account.Balance)
 	if err != nil {
@@ -317,7 +310,8 @@ func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUI
 			Str("stored_balance", account.Balance).
 			Str("calculated", calculated.StringFixed(4)).
 			Msg("Balance mismatch detected")
-		return false, fmt.Errorf("balance mismatch: stored %s, calculated %s", account.Balance, calculated.StringFixed(4))
+		return false, fmt.Errorf("balance mismatch: stored %s, calculated %s",
+			account.Balance, calculated.StringFixed(4))
 	}
 
 	log.Info().
@@ -328,7 +322,7 @@ func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUI
 	return true, nil
 }
 
-// validatePositiveAmount now uses decimal
+// validatePositiveAmount parses and validates that amount > 0
 func validatePositiveAmount(amountStr string) (decimal.Decimal, error) {
 	amt, err := decimal.NewFromString(amountStr)
 	if err != nil {
