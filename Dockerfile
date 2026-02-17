@@ -11,8 +11,6 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /ledger .
 COPY --from=builder /app/docs ./docs
-COPY .env.example .env  
-# copy template; override in production
 
 EXPOSE 8080
 CMD ["/app/ledger"]

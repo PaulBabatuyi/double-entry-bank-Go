@@ -102,6 +102,19 @@ func (q *Queries) GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Accoun
 	return i, err
 }
 
+const getCalculatedBalance = `-- name: GetCalculatedBalance :one
+SELECT COALESCE(SUM(credit::NUMERIC) - SUM(debit::NUMERIC), 0::NUMERIC) AS calculated_balance
+FROM entries
+WHERE account_id = $1
+`
+
+func (q *Queries) GetCalculatedBalance(ctx context.Context, accountID uuid.UUID) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getCalculatedBalance, accountID)
+	var calculated_balance interface{}
+	err := row.Scan(&calculated_balance)
+	return calculated_balance, err
+}
+
 const getSettlementAccount = `-- name: GetSettlementAccount :one
 SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts
 WHERE is_system = TRUE AND name = 'Settlement Account'

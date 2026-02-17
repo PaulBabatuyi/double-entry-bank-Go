@@ -18,6 +18,7 @@ type Querier interface {
 	// lock prevents concurrent transactions from reading a stale balance.
 	GetAccountBalance(ctx context.Context, accountID uuid.UUID) (int32, error)
 	GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Account, error)
+	GetCalculatedBalance(ctx context.Context, accountID uuid.UUID) (interface{}, error)
 	GetSettlementAccount(ctx context.Context) (Account, error)
 	GetSettlementAccountForUpdate(ctx context.Context) (Account, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
