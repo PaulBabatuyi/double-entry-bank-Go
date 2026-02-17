@@ -36,20 +36,20 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/sqlc.Account"
+                                "$ref": "#/definitions/internal_api.AccountResponse"
                             }
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -91,25 +91,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/sqlc.Account"
+                            "$ref": "#/definitions/internal_api.AccountResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -143,25 +143,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/sqlc.Account"
+                            "$ref": "#/definitions/internal_api.AccountResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -212,19 +212,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.MessageResponse"
+                            "$ref": "#/definitions/internal_api.MessageResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -272,26 +272,95 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/sqlc.Entry"
+                                "$ref": "#/definitions/internal_api.EntryResponse"
                             }
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/reconcile": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Verifies stored balance matches sum of all ledger entries (credits - debits)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accounts"
+                ],
+                "summary": "Reconcile account balance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "matched": {
+                                    "type": "boolean"
+                                },
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -342,19 +411,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.MessageResponse"
+                            "$ref": "#/definitions/internal_api.MessageResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -396,25 +465,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.TokenResponse"
+                            "$ref": "#/definitions/internal_api.TokenResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -456,25 +525,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/api.RegisterResponse"
+                            "$ref": "#/definitions/internal_api.RegisterResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -524,19 +593,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.MessageResponse"
+                            "$ref": "#/definitions/internal_api.MessageResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -544,76 +613,14 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "api.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.MessageResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.RegisterResponse": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "token": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.TokenResponse": {
-            "type": "object",
-            "properties": {
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
-        "sql.NullString": {
-            "type": "object",
-            "properties": {
-                "string": {
-                    "type": "string"
-                },
-                "valid": {
-                    "description": "Valid is true if String is not NULL",
-                    "type": "boolean"
-                }
-            }
-        },
-        "sql.NullTime": {
-            "type": "object",
-            "properties": {
-                "time": {
-                    "type": "string"
-                },
-                "valid": {
-                    "description": "Valid is true if Time is not NULL",
-                    "type": "boolean"
-                }
-            }
-        },
-        "sqlc.Account": {
+        "internal_api.AccountResponse": {
             "type": "object",
             "properties": {
                 "balance": {
                     "type": "string"
                 },
                 "created_at": {
-                    "$ref": "#/definitions/sql.NullTime"
+                    "type": "string"
                 },
                 "currency": {
                     "type": "string"
@@ -628,18 +635,19 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "owner_id": {
-                    "$ref": "#/definitions/uuid.NullUUID"
+                    "description": "nullable",
+                    "type": "string"
                 }
             }
         },
-        "sqlc.Entry": {
+        "internal_api.EntryResponse": {
             "type": "object",
             "properties": {
                 "account_id": {
                     "type": "string"
                 },
                 "created_at": {
-                    "$ref": "#/definitions/sql.NullTime"
+                    "type": "string"
                 },
                 "credit": {
                     "type": "string"
@@ -648,55 +656,76 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "description": {
-                    "$ref": "#/definitions/sql.NullString"
+                    "type": "string"
                 },
                 "id": {
                     "type": "string"
                 },
                 "operation_type": {
-                    "$ref": "#/definitions/sqlc.OperationType"
+                    "type": "string"
                 },
                 "transaction_id": {
                     "type": "string"
                 }
             }
         },
-        "sqlc.OperationType": {
-            "type": "string",
-            "enum": [
-                "deposit",
-                "withdrawal",
-                "transfer"
-            ],
-            "x-enum-varnames": [
-                "OperationTypeDeposit",
-                "OperationTypeWithdrawal",
-                "OperationTypeTransfer"
-            ]
-        },
-        "uuid.NullUUID": {
+        "internal_api.ErrorResponse": {
             "type": "object",
             "properties": {
-                "uuid": {
+                "error": {
                     "type": "string"
-                },
-                "valid": {
-                    "description": "Valid is true if UUID is not NULL",
-                    "type": "boolean"
                 }
             }
+        },
+        "internal_api.MessageResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api.RegisterResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api.TokenResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "Bearer": {
+            "description": "Type \"Bearer\" followed by a space and JWT token",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
-	Host:             "",
-	BasePath:         "",
+	Version:          "1.0",
+	Host:             "localhost:8080",
+	BasePath:         "/",
 	Schemes:          []string{},
-	Title:            "",
-	Description:      "",
+	Title:            "Double-Entry Bank Ledger API",
+	Description:      "Production-grade double-entry accounting ledger",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

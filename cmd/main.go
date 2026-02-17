@@ -27,6 +27,15 @@ func initLogger() {
 	zlog.Info().Msg("Logger initialized")
 }
 
+// @title           Double-Entry Bank Ledger API
+// @version         1.0
+// @description     Production-grade double-entry accounting ledger
+// @host            localhost:8080
+// @BasePath        /
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token
 func main() {
 	initLogger()
 
@@ -55,6 +64,13 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reqID := middleware.GetReqID(r.Context())
+			zlog.Info().Str("request_id", reqID).Str("path", r.URL.Path).Msg("Request received")
+			next.ServeHTTP(w, r)
+		})
+	})
 	// Public routes
 	r.Post("/register", h.Register)
 	r.Post("/login", h.Login)
@@ -85,6 +101,7 @@ func main() {
 		r.Post("/accounts/{id}/withdraw", h.Withdraw)
 		r.Post("/transfers", h.Transfer)
 		r.Get("/accounts/{id}/entries", h.GetEntries)
+		r.Get("/accounts/{id}/reconcile", h.ReconcileAccount)
 	})
 
 	port := os.Getenv("PORT")

@@ -1,50 +1,11 @@
+basePath: /
 definitions:
-  api.ErrorResponse:
-    properties:
-      error:
-        type: string
-    type: object
-  api.MessageResponse:
-    properties:
-      message:
-        type: string
-    type: object
-  api.RegisterResponse:
-    properties:
-      email:
-        type: string
-      token:
-        type: string
-      user_id:
-        type: string
-    type: object
-  api.TokenResponse:
-    properties:
-      token:
-        type: string
-    type: object
-  sql.NullString:
-    properties:
-      string:
-        type: string
-      valid:
-        description: Valid is true if String is not NULL
-        type: boolean
-    type: object
-  sql.NullTime:
-    properties:
-      time:
-        type: string
-      valid:
-        description: Valid is true if Time is not NULL
-        type: boolean
-    type: object
-  sqlc.Account:
+  internal_api.AccountResponse:
     properties:
       balance:
         type: string
       created_at:
-        $ref: '#/definitions/sql.NullTime'
+        type: string
       currency:
         type: string
       id:
@@ -54,47 +15,58 @@ definitions:
       name:
         type: string
       owner_id:
-        $ref: '#/definitions/uuid.NullUUID'
+        description: nullable
+        type: string
     type: object
-  sqlc.Entry:
+  internal_api.EntryResponse:
     properties:
       account_id:
         type: string
       created_at:
-        $ref: '#/definitions/sql.NullTime'
+        type: string
       credit:
         type: string
       debit:
         type: string
       description:
-        $ref: '#/definitions/sql.NullString'
+        type: string
       id:
         type: string
       operation_type:
-        $ref: '#/definitions/sqlc.OperationType'
+        type: string
       transaction_id:
         type: string
     type: object
-  sqlc.OperationType:
-    enum:
-    - deposit
-    - withdrawal
-    - transfer
-    type: string
-    x-enum-varnames:
-    - OperationTypeDeposit
-    - OperationTypeWithdrawal
-    - OperationTypeTransfer
-  uuid.NullUUID:
+  internal_api.ErrorResponse:
     properties:
-      uuid:
+      error:
         type: string
-      valid:
-        description: Valid is true if UUID is not NULL
-        type: boolean
     type: object
+  internal_api.MessageResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  internal_api.RegisterResponse:
+    properties:
+      email:
+        type: string
+      token:
+        type: string
+      user_id:
+        type: string
+    type: object
+  internal_api.TokenResponse:
+    properties:
+      token:
+        type: string
+    type: object
+host: localhost:8080
 info:
   contact: {}
+  description: Production-grade double-entry accounting ledger
+  title: Double-Entry Bank Ledger API
+  version: "1.0"
 paths:
   /accounts:
     get:
@@ -106,16 +78,16 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/sqlc.Account'
+              $ref: '#/definitions/internal_api.AccountResponse'
             type: array
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - Bearer: []
       summary: List user accounts
@@ -141,19 +113,19 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/sqlc.Account'
+            $ref: '#/definitions/internal_api.AccountResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - Bearer: []
       summary: Create a new account
@@ -174,19 +146,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/sqlc.Account'
+            $ref: '#/definitions/internal_api.AccountResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - Bearer: []
       summary: Get account details
@@ -218,15 +190,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.MessageResponse'
+            $ref: '#/definitions/internal_api.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - Bearer: []
       summary: Deposit money into account
@@ -256,23 +228,68 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/sqlc.Entry'
+              $ref: '#/definitions/internal_api.EntryResponse'
             type: array
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - Bearer: []
       summary: Get account entries
+      tags:
+      - accounts
+  /accounts/{id}/reconcile:
+    get:
+      description: Verifies stored balance matches sum of all ledger entries (credits
+        - debits)
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              matched:
+                type: boolean
+              message:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Reconcile account balance
       tags:
       - accounts
   /accounts/{id}/withdraw:
@@ -301,15 +318,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.MessageResponse'
+            $ref: '#/definitions/internal_api.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - Bearer: []
       summary: Withdraw money from account
@@ -338,19 +355,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.TokenResponse'
+            $ref: '#/definitions/internal_api.TokenResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       summary: Login user
       tags:
       - auth
@@ -378,19 +395,19 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/api.RegisterResponse'
+            $ref: '#/definitions/internal_api.RegisterResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       summary: Register a new user
       tags:
       - auth
@@ -419,18 +436,24 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.MessageResponse'
+            $ref: '#/definitions/internal_api.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - Bearer: []
       summary: Transfer money between accounts
       tags:
       - accounts
+securityDefinitions:
+  Bearer:
+    description: Type "Bearer" followed by a space and JWT token
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

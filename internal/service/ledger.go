@@ -9,6 +9,8 @@ import (
 	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/db"
 	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/postgres/sqlc"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
+	"github.com/shopspring/decimal"
 )
 
 var (
@@ -29,7 +31,8 @@ func NewLedgerService(store *db.Store) *LedgerService {
 
 // Deposit external money into user account
 func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amountStr string) error {
-	if err := validatePositiveAmount(amountStr); err != nil {
+	amount, err := validatePositiveAmount(amountStr)
+	if err != nil {
 		return err
 	}
 
@@ -39,7 +42,7 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 			return fmt.Errorf("settlement account not found: %w", err)
 		}
 
-		account, err := q.GetAccount(ctx, accountID)
+		account, err := q.GetAccountForUpdate(ctx, accountID)
 		if err != nil {
 			return fmt.Errorf("account not found: %w", err)
 		}
@@ -53,8 +56,8 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 		// 1. Credit user account (entry)
 		_, err = q.CreateEntry(ctx, sqlc.CreateEntryParams{
 			AccountID:     accountID,
-			Debit:         "0.0000",
-			Credit:        amountStr,
+			Debit:         decimal.Zero.StringFixed(4),
+			Credit:        amount.StringFixed(4),
 			TransactionID: txID,
 			OperationType: "deposit",
 			Description:   sql.NullString{String: "External deposit", Valid: true},
@@ -66,8 +69,8 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 		// 2. Debit settlement (opposing entry)
 		_, err = q.CreateEntry(ctx, sqlc.CreateEntryParams{
 			AccountID:     settlement.ID,
-			Debit:         amountStr,
-			Credit:        "0.0000",
+			Debit:         amount.StringFixed(4),
+			Credit:        decimal.Zero.StringFixed(4),
 			TransactionID: txID,
 			OperationType: "deposit",
 			Description:   sql.NullString{String: fmt.Sprintf("Deposit to account %s", accountID), Valid: true},
@@ -76,9 +79,9 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 			return err
 		}
 
-		// 3. Update balances
+		// 3. Update balances (using decimal)
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
-			Balance: amountStr,
+			Balance: amount.StringFixed(4),
 			ID:      accountID,
 		})
 		if err != nil {
@@ -86,20 +89,27 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 		}
 
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
-			Balance: fmt.Sprintf("-%s", amountStr),
+			Balance: amount.Neg().StringFixed(4),
 			ID:      settlement.ID,
 		})
 		if err != nil {
 			return err
 		}
 
+		log.Info().
+			Str("tx_id", txID.String()).
+			Str("account_id", accountID.String()).
+			Str("amount", amount.StringFixed(4)).
+			Msg("Deposit completed")
+
 		return nil
 	})
 }
 
-// Withdraw money from user account to external
+// Withdraw external money from user account
 func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amountStr string) error {
-	if err := validatePositiveAmount(amountStr); err != nil {
+	amount, err := validatePositiveAmount(amountStr)
+	if err != nil {
 		return err
 	}
 
@@ -109,7 +119,7 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 			return err
 		}
 
-		account, err := q.GetAccount(ctx, accountID)
+		account, err := q.GetAccountForUpdate(ctx, accountID)
 		if err != nil {
 			return err
 		}
@@ -118,9 +128,12 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 			return ErrCurrencyMismatch
 		}
 
-		// Check sufficient balance (a simple read — serializable tx prevents races)
-		// string comparison is safe for same precision/format
-		if account.Balance < amountStr {
+		balanceDec, err := decimal.NewFromString(account.Balance)
+		if err != nil {
+			return errors.New("invalid balance")
+		}
+
+		if balanceDec.LessThan(amount) {
 			return ErrInsufficientFunds
 		}
 
@@ -129,8 +142,8 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 		// 1. Debit user
 		_, err = q.CreateEntry(ctx, sqlc.CreateEntryParams{
 			AccountID:     accountID,
-			Debit:         amountStr,
-			Credit:        "0.0000",
+			Debit:         amount.StringFixed(4),
+			Credit:        decimal.Zero.StringFixed(4),
 			TransactionID: txID,
 			OperationType: "withdrawal",
 			Description:   sql.NullString{String: "External withdrawal", Valid: true},
@@ -142,8 +155,8 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 		// 2. Credit settlement
 		_, err = q.CreateEntry(ctx, sqlc.CreateEntryParams{
 			AccountID:     settlement.ID,
-			Debit:         "0.0000",
-			Credit:        amountStr,
+			Debit:         decimal.Zero.StringFixed(4),
+			Credit:        amount.StringFixed(4),
 			TransactionID: txID,
 			OperationType: "withdrawal",
 			Description:   sql.NullString{String: fmt.Sprintf("Withdrawal from %s", accountID), Valid: true},
@@ -154,7 +167,7 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 
 		// 3. Update balances
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
-			Balance: fmt.Sprintf("-%s", amountStr),
+			Balance: amount.Neg().StringFixed(4),
 			ID:      accountID,
 		})
 		if err != nil {
@@ -162,12 +175,18 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 		}
 
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
-			Balance: amountStr,
+			Balance: amount.StringFixed(4),
 			ID:      settlement.ID,
 		})
 		if err != nil {
 			return err
 		}
+
+		log.Info().
+			Str("tx_id", txID.String()).
+			Str("account_id", accountID.String()).
+			Str("amount", amount.StringFixed(4)).
+			Msg("Withdrawal completed")
 
 		return nil
 	})
@@ -175,7 +194,8 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 
 // Transfer between two user accounts
 func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, amountStr string) error {
-	if err := validatePositiveAmount(amountStr); err != nil {
+	amount, err := validatePositiveAmount(amountStr)
+	if err != nil {
 		return err
 	}
 
@@ -184,12 +204,12 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 	}
 
 	return s.store.ExecTx(ctx, func(q *sqlc.Queries) error {
-		fromAcc, err := q.GetAccount(ctx, fromID)
+		fromAcc, err := q.GetAccountForUpdate(ctx, fromID)
 		if err != nil {
 			return err
 		}
 
-		toAcc, err := q.GetAccount(ctx, toID)
+		toAcc, err := q.GetAccountForUpdate(ctx, toID)
 		if err != nil {
 			return err
 		}
@@ -198,17 +218,22 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 			return ErrCurrencyMismatch
 		}
 
-		if fromAcc.Balance < amountStr {
+		fromBalance, err := decimal.NewFromString(fromAcc.Balance)
+		if err != nil {
+			return errors.New("invalid from balance")
+		}
+
+		if fromBalance.LessThan(amount) {
 			return ErrInsufficientFunds
 		}
 
 		txID := uuid.New()
 
-		// 1. Debit from account
+		// 1. Debit from
 		_, err = q.CreateEntry(ctx, sqlc.CreateEntryParams{
 			AccountID:     fromID,
-			Debit:         amountStr,
-			Credit:        "0.0000",
+			Debit:         amount.StringFixed(4),
+			Credit:        decimal.Zero.StringFixed(4),
 			TransactionID: txID,
 			OperationType: "transfer",
 			Description:   sql.NullString{String: fmt.Sprintf("Transfer to %s", toID), Valid: true},
@@ -217,11 +242,11 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 			return err
 		}
 
-		// 2. Credit to account
+		// 2. Credit to
 		_, err = q.CreateEntry(ctx, sqlc.CreateEntryParams{
 			AccountID:     toID,
-			Debit:         "0.0000",
-			Credit:        amountStr,
+			Debit:         decimal.Zero.StringFixed(4),
+			Credit:        amount.StringFixed(4),
 			TransactionID: txID,
 			OperationType: "transfer",
 			Description:   sql.NullString{String: fmt.Sprintf("Transfer from %s", fromID), Valid: true},
@@ -232,7 +257,7 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 
 		// 3. Update balances
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
-			Balance: fmt.Sprintf("-%s", amountStr),
+			Balance: amount.Neg().StringFixed(4),
 			ID:      fromID,
 		})
 		if err != nil {
@@ -240,22 +265,77 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 		}
 
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
-			Balance: amountStr,
+			Balance: amount.StringFixed(4),
 			ID:      toID,
 		})
 		if err != nil {
 			return err
 		}
 
+		log.Info().
+			Str("tx_id", txID.String()).
+			Str("from_id", fromID.String()).
+			Str("to_id", toID.String()).
+			Str("amount", amount.StringFixed(4)).
+			Msg("Transfer completed")
+
 		return nil
 	})
 }
 
-// validate amount string
-func validatePositiveAmount(amount string) error {
-	// In real project, i will use decimal.Decimal.Parse(amount) > 0, but For now basic string check
-	if amount == "" || amount == "0.0000" || amount[0] == '-' {
-		return ErrInvalidAmount
+// ReconcileAccount Reconcile  balance Verifies stored balance == SUM(credits) - SUM(debits)
+func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUID) (bool, error) {
+	account, err := s.store.Queries.GetAccount(ctx, accountID)
+	if err != nil {
+		return false, fmt.Errorf("account not found: %w", err)
 	}
-	return nil
+
+	entries, err := s.store.Queries.ListEntriesByAccount(ctx, sqlc.ListEntriesByAccountParams{
+		AccountID: accountID,
+		Limit:     0, // all entries (no limit)
+		Offset:    0,
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch entries: %w", err)
+	}
+
+	calculated := decimal.Zero
+	for _, entry := range entries {
+		debit, _ := decimal.NewFromString(entry.Debit)
+		credit, _ := decimal.NewFromString(entry.Credit)
+		calculated = calculated.Add(credit).Sub(debit)
+	}
+
+	stored, err := decimal.NewFromString(account.Balance)
+	if err != nil {
+		return false, fmt.Errorf("invalid stored balance: %w", err)
+	}
+
+	if !stored.Equal(calculated) {
+		log.Error().
+			Str("account_id", accountID.String()).
+			Str("stored_balance", account.Balance).
+			Str("calculated", calculated.StringFixed(4)).
+			Msg("Balance mismatch detected")
+		return false, fmt.Errorf("balance mismatch: stored %s, calculated %s", account.Balance, calculated.StringFixed(4))
+	}
+
+	log.Info().
+		Str("account_id", accountID.String()).
+		Str("balance", account.Balance).
+		Msg("Account reconciled successfully")
+
+	return true, nil
+}
+
+// validatePositiveAmount now uses decimal
+func validatePositiveAmount(amountStr string) (decimal.Decimal, error) {
+	amt, err := decimal.NewFromString(amountStr)
+	if err != nil {
+		return decimal.Zero, ErrInvalidAmount
+	}
+	if amt.LessThanOrEqual(decimal.Zero) {
+		return decimal.Zero, ErrInvalidAmount
+	}
+	return amt, nil
 }

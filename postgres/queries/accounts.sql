@@ -8,6 +8,12 @@ SELECT * FROM accounts
 WHERE id = $1
 LIMIT 1;
 
+-- name: GetAccountForUpdate :one
+SELECT * FROM accounts
+WHERE id = $1
+LIMIT 1
+FOR UPDATE; -- locks row for update, prevents TOCTOU races
+
 -- name: ListAccountsByOwner :many
 SELECT * FROM accounts
 WHERE owner_id = $1

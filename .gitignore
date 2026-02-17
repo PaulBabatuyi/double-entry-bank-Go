@@ -5,15 +5,11 @@
 # Output of the go coverage tool
 *.out
 
-# Dependency directories
-vendor/
-
 # Go workspace file
 go.work
 
-# Docker
 .env
 
-*.py
 ./internal/service/ledger_test.go
 *_test.go
+correct.md
