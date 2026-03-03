@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type Handler struct {
@@ -28,7 +29,9 @@ func NewHandler(ledger *service.LedgerService, store *db.Store) *Handler {
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Error().Err(err).Msg("Failed to encode JSON response")
+	}
 }
 
 func respondError(w http.ResponseWriter, status int, msg string) {
@@ -53,6 +56,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		log.Warn().Err(err).Msg("Failed to decode register request")
 		respondError(w, http.StatusBadRequest, "invalid input")
 		return
 	}
@@ -64,6 +68,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to hash password")
 		respondError(w, http.StatusInternalServerError, "failed to hash password")
 		return
 	}
@@ -73,16 +78,19 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		HashedPassword: string(hashed),
 	})
 	if err != nil {
+		log.Error().Err(err).Str("email", input.Email).Msg("Failed to create user")
 		respondError(w, http.StatusConflict, "user already exists or failed")
 		return
 	}
 
 	token, err := GenerateToken(user.ID)
 	if err != nil {
+		log.Error().Err(err).Str("user_id", user.ID.String()).Msg("Failed to generate token")
 		respondError(w, http.StatusInternalServerError, "failed to generate token")
 		return
 	}
 
+	log.Info().Str("user_id", user.ID.String()).Str("email", user.Email).Msg("User registered successfully")
 	respondJSON(w, http.StatusCreated, RegisterResponse{
 		UserID: user.ID.String(),
 		Email:  user.Email,
@@ -108,27 +116,32 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		log.Warn().Err(err).Msg("Failed to decode login request")
 		respondError(w, http.StatusBadRequest, "invalid input")
 		return
 	}
 
 	user, err := h.store.Queries.GetUserByEmail(r.Context(), input.Email)
 	if err != nil {
+		log.Warn().Err(err).Str("email", input.Email).Msg("Login failed - user not found")
 		respondError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(input.Password)); err != nil {
+		log.Warn().Str("email", input.Email).Msg("Login failed - invalid password")
 		respondError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
 	token, err := GenerateToken(user.ID)
 	if err != nil {
+		log.Error().Err(err).Str("user_id", user.ID.String()).Msg("Failed to generate token")
 		respondError(w, http.StatusInternalServerError, "failed to generate token")
 		return
 	}
 
+	log.Info().Str("user_id", user.ID.String()).Str("email", user.Email).Msg("User logged in successfully")
 	respondJSON(w, http.StatusOK, TokenResponse{Token: token})
 }
 
@@ -146,13 +159,24 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts [post]
 // @Security     Bearer
 func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
-	_, claims, _ := jwtauth.FromContext(r.Context())
-	userIDStr, ok := claims["user_id"].(string)
-	if !ok {
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to extract JWT from context")
 		respondError(w, http.StatusUnauthorized, "invalid token")
 		return
 	}
-	userID, _ := uuid.Parse(userIDStr)
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		log.Warn().Msg("user_id claim missing or invalid in JWT")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id_str", userIDStr).Msg("Invalid user_id UUID in token")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
 
 	var input struct {
 		Name string `json:"name"`
@@ -169,10 +193,12 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		IsSystem: false,
 	})
 	if err != nil {
+		log.Error().Err(err).Str("user_id", userID.String()).Str("name", input.Name).Msg("Failed to create account")
 		respondError(w, http.StatusInternalServerError, "failed to create account")
 		return
 	}
 
+	log.Info().Str("account_id", acc.ID.String()).Str("user_id", userID.String()).Str("name", acc.Name).Msg("Account created")
 	respondJSON(w, http.StatusCreated, toAccountResponse(acc))
 }
 
@@ -187,12 +213,28 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts [get]
 // @Security     Bearer
 func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
-	_, claims, _ := jwtauth.FromContext(r.Context())
-	userIDStr, _ := claims["user_id"].(string)
-	userID, _ := uuid.Parse(userIDStr)
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to extract JWT from context")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		log.Warn().Msg("user_id claim missing or invalid in JWT")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id_str", userIDStr).Msg("Invalid user_id UUID in token")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
 
 	accounts, err := h.store.Queries.ListAccountsByOwner(r.Context(), uuid.NullUUID{UUID: userID, Valid: true})
 	if err != nil {
+		log.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to list accounts")
 		respondError(w, http.StatusInternalServerError, "failed to list accounts")
 		return
 	}
@@ -219,9 +261,24 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts/{id} [get]
 // @Security     Bearer
 func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
-	_, claims, _ := jwtauth.FromContext(r.Context())
-	userIDStr, _ := claims["user_id"].(string)
-	userID, _ := uuid.Parse(userIDStr)
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to extract JWT from context")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		log.Warn().Msg("user_id claim missing or invalid in JWT")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id_str", userIDStr).Msg("Invalid user_id UUID in token")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
 
 	accountIDStr := chi.URLParam(r, "id")
 	accountID, err := uuid.Parse(accountIDStr)
@@ -232,11 +289,13 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
 	if err != nil {
+		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Account not found")
 		respondError(w, http.StatusNotFound, "account not found")
 		return
 	}
 
 	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		log.Warn().Str("account_id", accountID.String()).Str("user_id", userID.String()).Str("owner_id", acc.OwnerID.UUID.String()).Msg("Access denied to account")
 		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
@@ -259,9 +318,24 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts/{id}/deposit [post]
 // @Security     Bearer
 func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
-	_, claims, _ := jwtauth.FromContext(r.Context())
-	userIDStr, _ := claims["user_id"].(string)
-	userID, _ := uuid.Parse(userIDStr)
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to extract JWT from context")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		log.Warn().Msg("user_id claim missing or invalid in JWT")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id_str", userIDStr).Msg("Invalid user_id UUID in token")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
 
 	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -271,10 +345,12 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
 	if err != nil {
+		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Deposit failed - account not found")
 		respondError(w, http.StatusNotFound, "account not found")
 		return
 	}
 	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		log.Warn().Str("account_id", accountID.String()).Str("user_id", userID.String()).Msg("Deposit denied - access forbidden")
 		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
@@ -283,22 +359,23 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 		Amount string `json:"amount"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		log.Warn().Err(err).Msg("Failed to decode deposit request")
 		respondError(w, http.StatusBadRequest, "invalid input")
 		return
 	}
 
 	err = h.ledger.Deposit(r.Context(), accountID, input.Amount)
 	if err != nil {
-		code := http.StatusBadRequest
-		if errors.Is(err, service.ErrInsufficientFunds) || errors.Is(err, service.ErrCurrencyMismatch) {
+		log.Error().Err(err).Str("account_id", accountID.String()).Str("amount", input.Amount).Msg("Deposit failed")
+		code := http.StatusInternalServerError
+		if errors.Is(err, service.ErrInvalidAmount) || errors.Is(err, service.ErrCurrencyMismatch) {
 			code = http.StatusBadRequest
-		} else {
-			code = http.StatusInternalServerError
 		}
 		respondError(w, code, err.Error())
 		return
 	}
 
+	log.Info().Str("account_id", accountID.String()).Str("user_id", userID.String()).Str("amount", input.Amount).Msg("Deposit successful")
 	respondJSON(w, http.StatusOK, MessageResponse{Message: "deposit successful"})
 }
 
@@ -317,9 +394,24 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts/{id}/withdraw [post]
 // @Security     Bearer
 func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
-	_, claims, _ := jwtauth.FromContext(r.Context())
-	userIDStr, _ := claims["user_id"].(string)
-	userID, _ := uuid.Parse(userIDStr)
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to extract JWT from context")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		log.Warn().Msg("user_id claim missing or invalid in JWT")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id_str", userIDStr).Msg("Invalid user_id UUID in token")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
 
 	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -329,10 +421,12 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
 	if err != nil {
+		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Withdrawal failed - account not found")
 		respondError(w, http.StatusNotFound, "account not found")
 		return
 	}
 	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		log.Warn().Str("account_id", accountID.String()).Str("user_id", userID.String()).Msg("Withdrawal denied - access forbidden")
 		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
@@ -341,20 +435,23 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		Amount string `json:"amount"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		log.Warn().Err(err).Msg("Failed to decode withdrawal request")
 		respondError(w, http.StatusBadRequest, "invalid input")
 		return
 	}
 
 	err = h.ledger.Withdraw(r.Context(), accountID, input.Amount)
 	if err != nil {
-		code := http.StatusBadRequest
-		if errors.Is(err, service.ErrInsufficientFunds) {
+		log.Error().Err(err).Str("account_id", accountID.String()).Str("amount", input.Amount).Msg("Withdrawal failed")
+		code := http.StatusInternalServerError
+		if errors.Is(err, service.ErrInsufficientFunds) || errors.Is(err, service.ErrInvalidAmount) || errors.Is(err, service.ErrCurrencyMismatch) {
 			code = http.StatusBadRequest
 		}
 		respondError(w, code, err.Error())
 		return
 	}
 
+	log.Info().Str("account_id", accountID.String()).Str("user_id", userID.String()).Str("amount", input.Amount).Msg("Withdrawal successful")
 	respondJSON(w, http.StatusOK, MessageResponse{Message: "withdrawal successful"})
 }
 
@@ -372,9 +469,24 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 // @Router       /transfers [post]
 // @Security     Bearer
 func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
-	_, claims, _ := jwtauth.FromContext(r.Context())
-	userIDStr, _ := claims["user_id"].(string)
-	userID, _ := uuid.Parse(userIDStr)
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to extract JWT from context")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		log.Warn().Msg("user_id claim missing or invalid in JWT")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id_str", userIDStr).Msg("Invalid user_id UUID in token")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
 
 	var input struct {
 		FromID uuid.UUID `json:"from_id"`
@@ -382,26 +494,31 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 		Amount string    `json:"amount"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		log.Warn().Err(err).Msg("Failed to decode transfer request")
 		respondError(w, http.StatusBadRequest, "invalid input")
 		return
 	}
 
 	fromAcc, err := h.store.Queries.GetAccount(r.Context(), input.FromID)
 	if err != nil {
+		log.Warn().Err(err).Str("from_id", input.FromID.String()).Msg("Transfer failed - from account not found")
 		respondError(w, http.StatusNotFound, "from account not found")
 		return
 	}
 	if fromAcc.OwnerID.Valid && fromAcc.OwnerID.UUID != userID {
+		log.Warn().Str("from_id", input.FromID.String()).Str("user_id", userID.String()).Msg("Transfer denied - access forbidden")
 		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
 
 	err = h.ledger.Transfer(r.Context(), input.FromID, input.ToID, input.Amount)
 	if err != nil {
+		log.Error().Err(err).Str("from_id", input.FromID.String()).Str("to_id", input.ToID.String()).Str("amount", input.Amount).Msg("Transfer failed")
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
+	log.Info().Str("from_id", input.FromID.String()).Str("to_id", input.ToID.String()).Str("user_id", userID.String()).Str("amount", input.Amount).Msg("Transfer successful")
 	respondJSON(w, http.StatusOK, MessageResponse{Message: "transfer successful"})
 }
 
@@ -421,9 +538,24 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts/{id}/entries [get]
 // @Security     Bearer
 func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
-	_, claims, _ := jwtauth.FromContext(r.Context())
-	userIDStr, _ := claims["user_id"].(string)
-	userID, _ := uuid.Parse(userIDStr)
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to extract JWT from context")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		log.Warn().Msg("user_id claim missing or invalid in JWT")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id_str", userIDStr).Msg("Invalid user_id UUID in token")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
 
 	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -433,10 +565,12 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
 	if err != nil {
+		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Get entries failed - account not found")
 		respondError(w, http.StatusNotFound, "account not found")
 		return
 	}
 	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		log.Warn().Str("account_id", accountID.String()).Str("user_id", userID.String()).Msg("Get entries denied - access forbidden")
 		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
@@ -460,6 +594,7 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 		Offset:    int32(offset),
 	})
 	if err != nil {
+		log.Error().Err(err).Str("account_id", accountID.String()).Msg("Failed to fetch entries")
 		respondError(w, http.StatusInternalServerError, "failed to fetch entries")
 		return
 	}
@@ -485,6 +620,26 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 // @Router       /transactions/{id} [get]
 // @Security     Bearer
 func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to extract JWT from context")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		log.Warn().Msg("user_id claim missing or invalid in JWT")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id_str", userIDStr).Msg("Invalid user_id UUID in token")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
 	transactionIDStr := chi.URLParam(r, "id")
 	transactionID, err := uuid.Parse(transactionIDStr)
 	if err != nil {
@@ -494,12 +649,35 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 
 	entries, err := h.store.Queries.ListEntriesByTransaction(r.Context(), transactionID)
 	if err != nil {
+		log.Error().Err(err).Str("transaction_id", transactionID.String()).Msg("Failed to fetch transaction")
 		respondError(w, http.StatusInternalServerError, "failed to fetch transaction")
 		return
 	}
 
 	if len(entries) == 0 {
+		log.Warn().Str("transaction_id", transactionID.String()).Msg("Transaction not found")
 		respondError(w, http.StatusNotFound, "transaction not found")
+		return
+	}
+
+	authorized := false
+	for _, entry := range entries {
+		acc, err := h.store.Queries.GetAccount(r.Context(), entry.AccountID)
+		if err != nil {
+			log.Error().Err(err).Str("account_id", entry.AccountID.String()).Msg("Failed to authorize transaction")
+			respondError(w, http.StatusInternalServerError, "failed to authorize transaction")
+			return
+		}
+
+		if acc.OwnerID.Valid && acc.OwnerID.UUID == userID {
+			authorized = true
+			break
+		}
+	}
+
+	if !authorized {
+		log.Warn().Str("transaction_id", transactionID.String()).Str("user_id", userID.String()).Msg("Get transaction denied - access forbidden")
+		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
 
@@ -525,9 +703,24 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts/{id}/reconcile [get]
 // @Security     Bearer
 func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
-	_, claims, _ := jwtauth.FromContext(r.Context())
-	userIDStr, _ := claims["user_id"].(string)
-	userID, _ := uuid.Parse(userIDStr)
+	_, claims, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to extract JWT from context")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		log.Warn().Msg("user_id claim missing or invalid in JWT")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id_str", userIDStr).Msg("Invalid user_id UUID in token")
+		respondError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
 
 	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -537,20 +730,24 @@ func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
 	if err != nil {
+		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Reconcile failed - account not found")
 		respondError(w, http.StatusNotFound, "account not found")
 		return
 	}
 	if acc.OwnerID.Valid && acc.OwnerID.UUID != userID {
+		log.Warn().Str("account_id", accountID.String()).Str("user_id", userID.String()).Msg("Reconcile denied - access forbidden")
 		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
 
 	matched, err := h.ledger.ReconcileAccount(r.Context(), accountID)
 	if err != nil {
+		log.Error().Err(err).Str("account_id", accountID.String()).Msg("Reconciliation failed")
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
+	log.Info().Str("account_id", accountID.String()).Bool("matched", matched).Msg("Reconciliation completed")
 	respondJSON(w, http.StatusOK, ReconcileResponse{
 		Matched: matched,
 		Message: "Account reconciled successfully",

@@ -1,7 +1,7 @@
 package api
 
 import (
-	"log"
+	"errors"
 	"os"
 	"time"
 
@@ -13,21 +13,30 @@ var (
 	TokenAuth *jwtauth.JWTAuth
 )
 
-func init() {
+func InitTokenAuthFromEnv() error {
 	secret := os.Getenv("JWT_SECRET")
+	return InitTokenAuth(secret)
+}
+
+func InitTokenAuth(secret string) error {
 	if secret == "" {
-		log.Fatal("JWT_SECRET environment variable is required")
+		return errors.New("JWT_SECRET environment variable is required")
 	}
 
 	if len(secret) < 32 {
-		log.Fatal("JWT_SECRET must be at least 32 characters")
+		return errors.New("JWT_SECRET must be at least 32 characters")
 	}
 
 	TokenAuth = jwtauth.New("HS256", []byte(secret), nil)
+	return nil
 }
 
 // GenerateToken for login
 func GenerateToken(userID uuid.UUID) (string, error) {
+	if TokenAuth == nil {
+		return "", errors.New("token auth is not initialized")
+	}
+
 	claims := map[string]interface{}{
 		"user_id": userID.String(),
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),
