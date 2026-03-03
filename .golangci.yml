@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/golangci/golangci-lint/master/.golangci.reference.yml
+# golangci-lint configuration
+# See https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - gosec
+    - gocritic
+    - revive
+
+linters-settings:
+  errcheck:
+    check-blank: true
+  govet:
+    enable-all: true
+  goimports:
+    local-prefixes: github.com/PaulBabatuyi/double-entry-bank-Go
+  gosec:
+    excludes:
+      - G404
+
+issues:
+  max-issues-per-linter: 50
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+    - path: postgres/sqlc/
+      linters:
+        - revive

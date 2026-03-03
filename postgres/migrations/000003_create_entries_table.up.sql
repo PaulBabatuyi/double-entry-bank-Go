@@ -1,6 +1,10 @@
-CREATE TYPE operation_type AS ENUM ('deposit', 'withdrawal', 'transfer');
+DO $$ BEGIN
+    CREATE TYPE operation_type AS ENUM ('deposit', 'withdrawal', 'transfer');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-CREATE TABLE entries (
+CREATE TABLE IF NOT EXISTS entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
     debit NUMERIC(19,4) NOT NULL DEFAULT 0.0000 CHECK (debit >= 0),
@@ -16,5 +20,5 @@ CREATE TABLE entries (
 );
 
 -- Optional index for fast lookups (common in ledgers)
-CREATE INDEX idx_entries_transaction_id ON entries(transaction_id);
-CREATE INDEX idx_entries_account_id ON entries(account_id);
+CREATE INDEX IF NOT EXISTS idx_entries_transaction_id ON entries(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_entries_account_id ON entries(account_id);

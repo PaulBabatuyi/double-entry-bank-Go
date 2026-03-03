@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+README.md
+CONTRIBUTING.md
+docs/*.md
+*.md
+
+# Testing
+*_test.go
+coverage.out
+coverage.txt
+*.test
+run_tests.sh
+run_tests.bat
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+build/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dependencies (will be downloaded in build)
+vendor/
+
+# Misc
+*.log
+tmp/
+temp/
+.cache/
+
+# CI/CD
+.golangci.yml
+Makefile
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
