@@ -36,11 +36,6 @@ LIMIT 1
 FOR UPDATE; -- lock prevents concurrent transactions from reading a stale balance.
 
 -- name: GetAccountBalance :one
-SELECT COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS calculated_balance
-FROM entries
-WHERE account_id = $1;
-
--- name: GetCalculatedBalance :one
-SELECT COALESCE(SUM(credit::NUMERIC) - SUM(debit::NUMERIC), 0::NUMERIC) AS calculated_balance
+SELECT (COALESCE(SUM(credit), 0::NUMERIC) - COALESCE(SUM(debit), 0::NUMERIC))::NUMERIC AS calculated_balance
 FROM entries
 WHERE account_id = $1;

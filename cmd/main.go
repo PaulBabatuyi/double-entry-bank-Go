@@ -45,6 +45,10 @@ func main() {
 		zlog.Warn().Err(err).Msg("No .env file found – using system env")
 	}
 
+	if err := api.InitTokenAuthFromEnv(); err != nil {
+		zlog.Fatal().Err(err).Msg("Failed to initialize JWT auth")
+	}
+
 	connStr := os.Getenv("DB_URL")
 	if connStr == "" {
 		connStr = "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable"

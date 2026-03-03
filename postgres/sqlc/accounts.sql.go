@@ -67,15 +67,15 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 
 const getAccountBalance = `-- name: GetAccountBalance :one
 
-SELECT COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS calculated_balance
+SELECT (COALESCE(SUM(credit), 0::NUMERIC) - COALESCE(SUM(debit), 0::NUMERIC))::NUMERIC AS calculated_balance
 FROM entries
 WHERE account_id = $1
 `
 
 // lock prevents concurrent transactions from reading a stale balance.
-func (q *Queries) GetAccountBalance(ctx context.Context, accountID uuid.UUID) (int32, error) {
+func (q *Queries) GetAccountBalance(ctx context.Context, accountID uuid.UUID) (string, error) {
 	row := q.db.QueryRowContext(ctx, getAccountBalance, accountID)
-	var calculated_balance int32
+	var calculated_balance string
 	err := row.Scan(&calculated_balance)
 	return calculated_balance, err
 }
@@ -100,19 +100,6 @@ func (q *Queries) GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Accoun
 		&i.CreatedAt,
 	)
 	return i, err
-}
-
-const getCalculatedBalance = `-- name: GetCalculatedBalance :one
-SELECT COALESCE(SUM(credit::NUMERIC) - SUM(debit::NUMERIC), 0::NUMERIC) AS calculated_balance
-FROM entries
-WHERE account_id = $1
-`
-
-func (q *Queries) GetCalculatedBalance(ctx context.Context, accountID uuid.UUID) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getCalculatedBalance, accountID)
-	var calculated_balance interface{}
-	err := row.Scan(&calculated_balance)
-	return calculated_balance, err
 }
 
 const getSettlementAccount = `-- name: GetSettlementAccount :one

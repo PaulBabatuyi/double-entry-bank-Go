@@ -290,24 +290,9 @@ func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUI
 		return false, fmt.Errorf("account not found: %w", err)
 	}
 
-	// Use GetCalculatedBalance which returns interface{} containing the NUMERIC value
-	calculatedRaw, err := s.store.Queries.GetCalculatedBalance(ctx, accountID)
+	calculatedStr, err := s.store.Queries.GetAccountBalance(ctx, accountID)
 	if err != nil {
 		return false, fmt.Errorf("failed to calculate balance: %w", err)
-	}
-
-	var calculatedStr string
-	switch v := calculatedRaw.(type) {
-	case []byte:
-		calculatedStr = string(v)
-	case string:
-		calculatedStr = v
-	case int64:
-		calculatedStr = fmt.Sprintf("%d.0000", v)
-	case float64:
-		calculatedStr = fmt.Sprintf("%.4f", v)
-	default:
-		return false, fmt.Errorf("unexpected calculated balance type: %T", calculatedRaw)
 	}
 
 	calculated, err := decimal.NewFromString(calculatedStr)
