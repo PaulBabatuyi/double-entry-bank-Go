@@ -1,0 +1,58 @@
+# Auto-label PRs based on changed files
+
+'documentation':
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/*.md'
+      - 'docs/**/*'
+
+'dependencies':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'go.mod'
+      - 'go.sum'
+
+'database':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'postgres/migrations/**/*'
+      - 'postgres/queries/**/*'
+      - 'postgres/sqlc/**/*'
+
+'api':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'internal/api/**/*'
+
+'service':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'internal/service/**/*'
+
+'tests':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*_test.go'
+      - 'run_tests.*'
+
+'ci/cd':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/**/*'
+      - '.golangci.yml'
+      - 'Makefile'
+
+'docker':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+
+'configuration':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '*.yml'
+      - '*.yaml'
+      - '*.json'
+      - '.env.example'

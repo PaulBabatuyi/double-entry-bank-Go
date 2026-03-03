@@ -1,5 +1,11 @@
 # Double-Entry Bank Ledger in Go
 
+[![CI](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/ci.yml/badge.svg)](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/ci.yml)
+[![Docker](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/docker.yml/badge.svg)](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/docker.yml)
+[![CodeQL](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/codeql.yml/badge.svg)](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/codeql.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/PaulBabatuyi/double-entry-bank-Go)](https://goreportcard.com/report/github.com/PaulBabatuyi/double-entry-bank-Go)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Production-grade demonstration of a **double-entry accounting ledger** backend in Go, simulating core banking operations with strong emphasis on financial correctness, traceability, and atomicity.
 
 This project was built to showcase backend engineering skills relevant to fintech environments — particularly **ledger systems**, **payment processing**, **settlement**, **reliability under concurrency**, and **observability** — aligning closely with roles building scalable financial infrastructure (e.g., fiat deposits/withdrawals, internal ledgers, reconciliation, auditability).
@@ -95,6 +101,7 @@ make sqlc
 
 Generate Swagger Docs
 swag init -g cmd/main.go --parseDependency --parseInternal
+
 Run Server
 make server
 # or: go run cmd/main.go
@@ -106,6 +113,138 @@ Swagger UI: http://localhost:8080/swagger/index.html
 Register: POST /register → get JWT
 Try endpoints (use Bearer token in Swagger "Authorize")
 
+### Running Tests
+
+The project includes comprehensive tests covering:
+- **Service layer**: Ledger operations (deposit, withdraw, transfer, reconcile)
+- **API layer**: HTTP handlers with authentication and authorization
+- **Database layer**: Store transactions and concurrency handling
+
+**Option 1: Using test script** (recommended)
+```bash
+# Linux/Mac
+chmod +x run_tests.sh
+./run_tests.sh
+
+# Windows
+run_tests.bat
+
+# With coverage report
+./run_tests.sh --coverage
+```
+
+**Option 2: Manual testing**
+```bash
+# Ensure DB is running
+make postgres
+
+# Run tests with race detection
+make test
+
+# Run tests with coverage
+make coverage
+
+# Run specific package tests
+go test -v -race ./internal/service
+go test -v -race ./internal/api
+go test -v -race ./internal/db
+```
+
+**Test Environment Variables:**
+- `TEST_DB_URL`: PostgreSQL connection string (default: `postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable`)
+
+**Test Coverage:**
+- Service tests: Deposit, withdraw, transfer, reconcile, concurrent operations, edge cases
+- Handler tests: All endpoints with auth/authz, success and failure scenarios
+- Store tests: Transaction atomicity, rollback, isolation levels
+
+### CI/CD
+
+The project includes a comprehensive CI/CD pipeline using **GitHub Actions**.
+
+#### Workflows
+
+**1. CI Pipeline** (`.github/workflows/ci.yml`)
+- **Triggers**: Push to `main`/`develop`, Pull Requests
+- **Jobs**:
+  - **Lint**: Runs `golangci-lint` with 30+ linters
+  - **Test**: Runs all tests with PostgreSQL service, race detection, and coverage reporting
+  - **Build**: Compiles binary and uploads as artifact
+  - **Security**: Runs Gosec security scanner and uploads results to GitHub Security
+
+**2. Docker Build** (`.github/workflows/docker.yml`)
+- **Triggers**: Push to `main`, version tags (`v*.*.*`), releases
+- **Actions**:
+  - Builds multi-platform Docker images (amd64, arm64)
+  - Pushes to GitHub Container Registry (`ghcr.io`)
+  - Tags images appropriately (latest, version, sha)
+  - Generates build attestations for supply chain security
+
+**3. CodeQL Analysis** (`.github/workflows/codeql.yml`)
+- **Triggers**: Push, PR, scheduled weekly
+- **Actions**: Advanced security scanning using GitHub CodeQL
+
+**4. Release** (`.github/workflows/release.yml`)
+- **Triggers**: Version tags (`v*.*.*`)
+- **Actions**:
+  - Builds binaries for multiple platforms (Linux, macOS, Windows)
+  - Generates changelog from git commits
+  - Creates GitHub release with binaries attached
+
+**5. Dependabot** (`.github/dependabot.yml`)
+- Automatically updates Go modules, Docker images, and GitHub Actions
+- Opens PRs weekly for dependency updates
+
+#### CI/CD Status Badges
+
+Add these to the top of your README for visibility:
+
+```markdown
+[![CI](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/ci.yml/badge.svg)](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/ci.yml)
+[![Docker](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/docker.yml/badge.svg)](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/docker.yml)
+[![CodeQL](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/codeql.yml/badge.svg)](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/codeql.yml)
+```
+
+#### Running Docker Image from GHCR
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/paulbabatuyi/double-entry-bank-go:latest
+
+# Run with environment variables
+docker run -p 8080:8080 \
+  -e DB_URL="postgresql://user:pass@host:5432/db?sslmode=disable" \
+  -e JWT_SECRET="your-secret-key-min-32-chars" \
+  ghcr.io/paulbabatuyi/double-entry-bank-go:latest
+```
+
+#### Creating a Release
+
+```bash
+# Create and push a version tag
+git tag -a v1.0.0 -m "Release version 1.0.0"
+git push origin v1.0.0
+
+# This automatically:
+# 1. Triggers release workflow
+# 2. Builds binaries for all platforms
+# 3. Creates GitHub release with changelog
+# 4. Builds and pushes Docker image with version tag
+```
+
+#### Local Linting (matches CI)
+
+```bash
+# Run the same linters as CI
+make lint
+
+# Or manually:
+golangci-lint run --timeout=5m
+```
+
+### Quick Reference (Makefile)
+
+```bash
 make postgres       # Start Postgres container
 make migrate-up     # Apply migrations
 make migrate-down   # Rollback last migration
@@ -114,3 +253,4 @@ make test           # Run tests with race detector
 make lint           # Run golangci-lint
 make coverage       # Generate & open coverage report
 make server         # Run the API server
+```

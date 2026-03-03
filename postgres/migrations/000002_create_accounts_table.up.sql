@@ -1,4 +1,4 @@
-CREATE TABLE accounts (
+CREATE TABLE IF NOT EXISTS accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -10,10 +10,7 @@ CREATE TABLE accounts (
 
 -- Seed the system Settlement account (external cash flow)
 INSERT INTO accounts (id, name, balance, currency, is_system)
-VALUES (
-    gen_random_uuid(),
-    'Settlement Account',
-    0.0000,
-    'NGN',
-    TRUE
+SELECT gen_random_uuid(), 'Settlement Account', 0.0000, 'NGN', TRUE
+WHERE NOT EXISTS (
+    SELECT 1 FROM accounts WHERE is_system = TRUE AND name = 'Settlement Account'
 );
