@@ -124,7 +124,7 @@ The project includes a modern web interface for easy demonstration:
 -  Real-time transaction history
 -  Responsive design (mobile & desktop)
 
-**Perfect for showcasing !**
+**Perfect for showcasing!**
 
 Access at: http://localhost:8080 after starting the server.
 - **Service layer**: Ledger operations (deposit, withdraw, transfer, reconcile)
