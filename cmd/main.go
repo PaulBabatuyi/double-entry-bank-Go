@@ -37,6 +37,38 @@ func initLogger() {
 // @in header
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token
+
+// noDirFileSystem wraps http.FileSystem to disable directory listings.
+// Directories that contain an index.html are still served normally.
+type noDirFileSystem struct {
+	base http.FileSystem
+}
+
+func (fs noDirFileSystem) Open(name string) (http.File, error) {
+	f, err := fs.base.Open(name)
+	if err != nil {
+		return nil, err
+	}
+
+	stat, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+
+	if stat.IsDir() {
+		// Only permit directories that have an index.html (e.g. the root).
+		idx, idxErr := fs.base.Open(name + "/index.html")
+		if idxErr != nil {
+			_ = f.Close()
+			return nil, os.ErrNotExist
+		}
+		_ = idx.Close()
+	}
+
+	return f, nil
+}
+
 func main() {
 	startTime := time.Now()
 
@@ -91,8 +123,8 @@ func main() {
 		})
 	})
 
-	// Serve static frontend files
-	fileServer := http.FileServer(http.Dir("./frontend"))
+	// Serve static frontend files without exposing directory listings
+	fileServer := http.FileServer(noDirFileSystem{http.Dir("./frontend")})
 	r.Handle("/*", fileServer)
 
 	// Public routes

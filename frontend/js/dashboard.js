@@ -47,26 +47,58 @@ const dashboard = {
       return;
     }
 
-    accountsList.innerHTML = accounts
-      .map(
-        (account) => `
-            <div class="account-card glass rounded-xl p-5 flex justify-between items-center cursor-pointer" 
-                 onclick="viewAccountDetails('${account.id}')">
-                <div>
-                    <div class="flex items-center space-x-2 mb-2">
-                        <i class="fas fa-wallet text-purple-400"></i>
-                        <h3 class="font-bold text-lg">${account.name}</h3>
-                    </div>
-                    <p class="text-sm text-gray-400">ID: ${utils.truncate(account.id)}</p>
-                </div>
-                <div class="text-right">
-                    <p class="text-2xl font-bold text-green-400">${utils.formatCurrency(account.balance)}</p>
-                    <p class="text-xs text-gray-400">${account.currency}</p>
-                </div>
-            </div>
-        `,
-      )
-      .join("");
+    accountsList.innerHTML = "";
+    const fragment = document.createDocumentFragment();
+
+    accounts.forEach((account) => {
+      const cardDiv = document.createElement("div");
+      cardDiv.className =
+        "account-card glass rounded-xl p-5 flex justify-between items-center cursor-pointer";
+      cardDiv.addEventListener("click", () => viewAccountDetails(account.id));
+
+      const leftDiv = document.createElement("div");
+
+      const headerDiv = document.createElement("div");
+      headerDiv.className = "flex items-center space-x-2 mb-2";
+
+      const icon = document.createElement("i");
+      icon.className = "fas fa-wallet text-purple-400";
+
+      const nameH3 = document.createElement("h3");
+      nameH3.className = "font-bold text-lg";
+      nameH3.textContent = account.name;
+
+      headerDiv.appendChild(icon);
+      headerDiv.appendChild(nameH3);
+
+      const idP = document.createElement("p");
+      idP.className = "text-sm text-gray-400";
+      idP.textContent = "ID: " + utils.truncate(account.id);
+
+      leftDiv.appendChild(headerDiv);
+      leftDiv.appendChild(idP);
+
+      const rightDiv = document.createElement("div");
+      rightDiv.className = "text-right";
+
+      const balanceP = document.createElement("p");
+      balanceP.className = "text-2xl font-bold text-green-400";
+      balanceP.textContent = utils.formatCurrency(account.balance);
+
+      const currencyP = document.createElement("p");
+      currencyP.className = "text-xs text-gray-400";
+      currencyP.textContent = account.currency;
+
+      rightDiv.appendChild(balanceP);
+      rightDiv.appendChild(currencyP);
+
+      cardDiv.appendChild(leftDiv);
+      cardDiv.appendChild(rightDiv);
+
+      fragment.appendChild(cardDiv);
+    });
+
+    accountsList.appendChild(fragment);
   },
 
   /**
@@ -107,12 +139,16 @@ const dashboard = {
     const accounts = state.getAccounts();
 
     if (accounts.length === 0) {
-      transactionsList.innerHTML = `
-                <div class="text-center py-8 text-gray-400">
-                    <i class="fas fa-file-invoice text-4xl mb-3"></i>
-                    <p>No transactions yet</p>
-                </div>
-            `;
+      transactionsList.innerHTML = "";
+      const empty = document.createElement("div");
+      empty.className = "text-center py-8 text-gray-400";
+      const emptyIcon = document.createElement("i");
+      emptyIcon.className = "fas fa-file-invoice text-4xl mb-3";
+      const emptyText = document.createElement("p");
+      emptyText.textContent = "No transactions yet";
+      empty.appendChild(emptyIcon);
+      empty.appendChild(emptyText);
+      transactionsList.appendChild(empty);
       return;
     }
 
@@ -121,38 +157,94 @@ const dashboard = {
       const { response, data: entries } = await api.getEntries(accountId);
 
       if (response.ok && entries && entries.length > 0) {
-        transactionsList.innerHTML = entries
-          .slice(0, 10)
-          .map(
-            (entry) => `
-                    <div class="transaction-item glass rounded-lg p-4 flex justify-between items-center">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-full ${entry.debit !== "0" ? "bg-red-500/20" : "bg-green-500/20"} 
-                                 flex items-center justify-center">
-                                <i class="fas ${entry.debit !== "0" ? "fa-arrow-up text-red-400" : "fa-arrow-down text-green-400"}"></i>
-                            </div>
-                            <div>
-                                <p class="font-semibold">${entry.operation_type || "Transaction"}</p>
-                                <p class="text-xs text-gray-400">${utils.formatDate(entry.created_at)}</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-bold ${entry.debit !== "0" ? "text-red-400" : "text-green-400"}">
-                                ${entry.debit !== "0" ? "-" : "+"}${utils.formatCurrency(entry.debit !== "0" ? entry.debit : entry.credit)}
-                            </p>
-                            <p class="text-xs text-gray-400">${utils.truncate(entry.transaction_id)}</p>
-                        </div>
-                    </div>
-                `,
-          )
-          .join("");
+        transactionsList.innerHTML = "";
+
+        const fragment = document.createDocumentFragment();
+
+        entries.slice(0, 10).forEach((entry) => {
+          const isDebit = parseFloat(entry.debit) > 0;
+          const operationText = entry.operation_type || "Transaction";
+          const dateText = utils.formatDate(entry.created_at);
+          const amountValue = isDebit ? entry.debit : entry.credit;
+          const amountText =
+            (isDebit ? "-" : "+") + utils.formatCurrency(amountValue);
+          const transactionIdText = utils.truncate(entry.transaction_id);
+
+          const itemDiv = document.createElement("div");
+          itemDiv.className =
+            "transaction-item glass rounded-lg p-4 flex justify-between items-center";
+
+          const leftDiv = document.createElement("div");
+          leftDiv.className = "flex items-center space-x-3";
+
+          const iconWrapper = document.createElement("div");
+          iconWrapper.className =
+            "w-10 h-10 rounded-full " +
+            (isDebit ? "bg-red-500/20" : "bg-green-500/20") +
+            " flex items-center justify-center";
+
+          const icon = document.createElement("i");
+          icon.className =
+            "fas " +
+            (isDebit
+              ? "fa-arrow-up text-red-400"
+              : "fa-arrow-down text-green-400");
+          iconWrapper.appendChild(icon);
+
+          const textWrapper = document.createElement("div");
+
+          const operationP = document.createElement("p");
+          operationP.className = "font-semibold";
+          operationP.textContent = operationText;
+
+          const dateP = document.createElement("p");
+          dateP.className = "text-xs text-gray-400";
+          dateP.textContent = dateText;
+
+          textWrapper.appendChild(operationP);
+          textWrapper.appendChild(dateP);
+
+          leftDiv.appendChild(iconWrapper);
+          leftDiv.appendChild(textWrapper);
+
+          const rightDiv = document.createElement("div");
+          rightDiv.className = "text-right";
+
+          const amountP = document.createElement("p");
+          amountP.className =
+            "font-bold " + (isDebit ? "text-red-400" : "text-green-400");
+          amountP.textContent = amountText;
+
+          const idP = document.createElement("p");
+          idP.className = "text-xs text-gray-400";
+          idP.textContent = transactionIdText;
+
+          rightDiv.appendChild(amountP);
+          rightDiv.appendChild(idP);
+
+          itemDiv.appendChild(leftDiv);
+          itemDiv.appendChild(rightDiv);
+
+          fragment.appendChild(itemDiv);
+        });
+
+        transactionsList.appendChild(fragment);
+
+        const statEl = document.getElementById("stat-transactions");
+        if (statEl) {
+          statEl.textContent = entries.length;
+        }
       } else {
-        transactionsList.innerHTML = `
-                    <div class="text-center py-8 text-gray-400">
-                        <i class="fas fa-file-invoice text-4xl mb-3"></i>
-                        <p>No transactions yet</p>
-                    </div>
-                `;
+        transactionsList.innerHTML = "";
+        const empty = document.createElement("div");
+        empty.className = "text-center py-8 text-gray-400";
+        const emptyIcon = document.createElement("i");
+        emptyIcon.className = "fas fa-file-invoice text-4xl mb-3";
+        const emptyText = document.createElement("p");
+        emptyText.textContent = "No transactions yet";
+        empty.appendChild(emptyIcon);
+        empty.appendChild(emptyText);
+        transactionsList.appendChild(empty);
       }
     } catch (error) {
       console.error("Error loading transactions:", error);
