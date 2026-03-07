@@ -88,7 +88,7 @@ currentUser = {
 ## Development Notes
 
 ### CORS Configuration
-The backend must have CORS enabled for `http://localhost:8080` to allow the frontend to make API calls.
+CORS is required only when the frontend is served from a different origin than the backend (for example, frontend at `http://localhost:3000` and API at `http://localhost:8080`). When both frontend and backend are served from `http://localhost:8080`, CORS is not involved.
 
 ### API Base URL
 Currently hardcoded to `http://localhost:8080`. For production, use environment variables or config file.
