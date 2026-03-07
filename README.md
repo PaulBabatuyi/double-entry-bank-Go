@@ -106,16 +106,27 @@ Run Server
 make server
 # or: go run cmd/main.go
 
-Access
-API base: http://localhost:8080
-Health check: http://localhost:8080/health
-Swagger UI: http://localhost:8080/swagger/index.html
-Register: POST /register → get JWT
-Try endpoints (use Bearer token in Swagger "Authorize")
+6. **Access**
+   - **Demo Frontend**: http://localhost:8080  (Interactive web UI)
+   - **API base**: http://localhost:8080
+   - **Health check**: http://localhost:8080/health
+   - **Swagger UI**: http://localhost:8080/swagger/index.html
+   - Register: POST /register → get JWT
+   - Try endpoints (use Bearer token in Swagger "Authorize")
 
-### Running Tests
+### Demo Frontend
 
-The project includes comprehensive tests covering:
+The project includes a modern web interface for easy demonstration:
+-  User registration & login
+-  Account management (create multiple accounts)
+-  Deposit & Withdraw operations
+-  Transfer between accounts
+-  Real-time transaction history
+-  Responsive design (mobile & desktop)
+
+**Perfect for showcasing !**
+
+Access at: http://localhost:8080 after starting the server.
 - **Service layer**: Ledger operations (deposit, withdraw, transfer, reconcile)
 - **API layer**: HTTP handlers with authentication and authorization
 - **Database layer**: Store transactions and concurrency handling

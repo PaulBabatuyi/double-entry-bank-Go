@@ -13,6 +13,7 @@ import (
 	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -70,6 +71,16 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 
+	// CORS middleware for frontend
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:8080", "http://127.0.0.1:8080"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reqID := middleware.GetReqID(r.Context())
@@ -77,6 +88,11 @@ func main() {
 			next.ServeHTTP(w, r)
 		})
 	})
+
+	// Serve static frontend files
+	fileServer := http.FileServer(http.Dir("./frontend"))
+	r.Handle("/*", fileServer)
+
 	// Public routes
 	r.Post("/register", h.Register)
 	r.Post("/login", h.Login)
