@@ -24,12 +24,23 @@ const api = {
       headers,
     });
 
-    const data = await response.json();
-
-    // Handle 401 Unauthorized
+    // Handle 401 Unauthorized before attempting to parse body (may be non-JSON)
     if (response.status === 401) {
       auth.logout();
       throw new Error("Unauthorized - please login again");
+    }
+
+    let data = null;
+    const contentType = response.headers.get("Content-Type") || "";
+    if (contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { message: text };
+      }
     }
 
     return { response, data };

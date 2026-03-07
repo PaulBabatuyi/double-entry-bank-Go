@@ -3,8 +3,8 @@
  * Contains all configuration constants and API endpoint definitions
  */
 
-// API Base URL - Change this for production deployment
-const API_BASE_URL = "http://localhost:8080";
+// API Base URL - Uses current origin to work across environments
+const API_BASE_URL = window.location.origin;
 
 // API Endpoints
 const API_ENDPOINTS = {
