@@ -26,17 +26,17 @@ Custom styling including:
 - Success/Error message styles
 - Gradient text effects
 
-#### `app.js` (16.9KB)
-Complete frontend logic with:
-- **State management**: currentUser object with accounts, token, email
-- **API integration**: All backend endpoints via Fetch API
-- **Authentication flow**: Register, login, logout, token persistence
-- **Dashboard operations**: Load accounts, transactions, update stats
-- **Transaction handlers**: Deposit, withdraw, transfer with validation
-- **Real-time updates**: Refresh data after each operation
-- **Error handling**: User-friendly error messages
-- **LocalStorage**: Token and email persistence
-
+#### JavaScript modules (`frontend/js/` directory)
+Complete frontend logic is implemented using modular scripts, including:
+- `api.js` for **API integration** with all backend endpoints via the Fetch API
+- `auth.js` for the **authentication flow**: register, login, logout, and token persistence
+- Additional feature modules that handle:
+  - **State management**: currentUser object with accounts, token, email
+  - **Dashboard operations**: Load accounts, transactions, update stats
+  - **Transaction handlers**: Deposit, withdraw, transfer with validation
+  - **Real-time updates**: Refresh data after each operation
+  - **Error handling**: User-friendly error messages
+  - **LocalStorage**: Token and email persistence
 #### `README.md` (3.5KB)
 Documentation covering:
 - Features overview
