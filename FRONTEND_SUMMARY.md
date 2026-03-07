@@ -64,7 +64,7 @@ r.Use(cors.Handler(cors.Options{
 
 #### Added Static File Serving
 ```go
-fileServer := http.FileServer(http.Dir("./public"))
+fileServer := http.FileServer(http.Dir("./frontend"))
 r.Handle("/*", fileServer)
 ```
 
