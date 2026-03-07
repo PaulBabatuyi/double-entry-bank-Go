@@ -588,6 +588,12 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 		offset = v
 	}
 
+	// Validate conversions to int32 to prevent overflow
+	if limit > 2147483647 || offset > 2147483647 {
+		respondError(w, http.StatusBadRequest, "limit or offset too large")
+		return
+	}
+
 	entries, err := h.store.Queries.ListEntriesByAccount(r.Context(), sqlc.ListEntriesByAccountParams{
 		AccountID: accountID,
 		Limit:     int32(limit),

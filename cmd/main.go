@@ -52,8 +52,10 @@ func main() {
 
 	connStr := os.Getenv("DB_URL")
 	if connStr == "" {
-		connStr = "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable"
-		zlog.Warn().Msg("Using default DB_URL – set DB_URL in .env")
+		// Default connection string for local development only
+		// In production, always set DB_URL environment variable
+		connStr = "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable" // #nosec G101 - This is only used for local development
+		zlog.Warn().Msg("Using default DB_URL – set DB_URL in .env for production")
 	}
 	dbConn, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -100,11 +102,13 @@ func main() {
 		zlog.Info().Msg("Health check requested")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"status":  "healthy",
 			"version": "0.1.0",
 			"uptime":  time.Since(startTime).String(),
-		})
+		}); err != nil {
+			zlog.Error().Err(err).Msg("Failed to encode health check response")
+		}
 	})
 
 	r.Get("/swagger/*", httpSwagger.Handler(
@@ -131,6 +135,19 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
+	// Configure HTTP server with timeouts for security
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
 	zlog.Info().Str("port", port).Msg("Starting server")
-	http.ListenAndServe(":"+port, r)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		zlog.Fatal().Err(err).Msg("Server failed to start")
+	}
 }
