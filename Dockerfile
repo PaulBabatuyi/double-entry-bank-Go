@@ -11,6 +11,7 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /ledger .
 COPY --from=builder /app/docs ./docs
+COPY --from=builder /app/frontend ./frontend
 
 EXPOSE 8080
 CMD ["/app/ledger"]
