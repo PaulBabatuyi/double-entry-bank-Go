@@ -51,7 +51,7 @@ const dashboard = {
       .map(
         (account) => `
             <div class="account-card glass rounded-xl p-5 flex justify-between items-center cursor-pointer" 
-                 onclick="dashboard.viewAccountDetails('${account.id}')">
+                 onclick="viewAccountDetails('${account.id}')">
                 <div>
                     <div class="flex items-center space-x-2 mb-2">
                         <i class="fas fa-wallet text-purple-400"></i>
