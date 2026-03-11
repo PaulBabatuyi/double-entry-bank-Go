@@ -360,4 +360,4 @@ v2.0.0-rc.1 # Release candidate (prerelease)
 
 ---
 
-Thank you for contributing! 🚀
+Thank you for contributing! 

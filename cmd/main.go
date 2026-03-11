@@ -13,6 +13,7 @@ import (
 	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -36,6 +37,38 @@ func initLogger() {
 // @in header
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token
+
+// noDirFileSystem wraps http.FileSystem to disable directory listings.
+// Directories that contain an index.html are still served normally.
+type noDirFileSystem struct {
+	base http.FileSystem
+}
+
+func (fs noDirFileSystem) Open(name string) (http.File, error) {
+	f, err := fs.base.Open(name)
+	if err != nil {
+		return nil, err
+	}
+
+	stat, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+
+	if stat.IsDir() {
+		// Only permit directories that have an index.html (e.g. the root).
+		idx, idxErr := fs.base.Open(name + "/index.html")
+		if idxErr != nil {
+			_ = f.Close()
+			return nil, os.ErrNotExist
+		}
+		_ = idx.Close()
+	}
+
+	return f, nil
+}
+
 func main() {
 	startTime := time.Now()
 
@@ -51,8 +84,10 @@ func main() {
 
 	connStr := os.Getenv("DB_URL")
 	if connStr == "" {
-		connStr = "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable"
-		zlog.Warn().Msg("Using default DB_URL – set DB_URL in .env")
+		// Default connection string for local development only
+		// In production, always set DB_URL environment variable
+		connStr = "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable" // #nosec G101 - This is only used for local development
+		zlog.Warn().Msg("Using default DB_URL – set DB_URL in .env for production")
 	}
 	dbConn, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -70,6 +105,16 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 
+	// CORS middleware for frontend (allows Vercel deployments and local development)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:8080", "http://127.0.0.1:8080", "https://*.vercel.app"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reqID := middleware.GetReqID(r.Context())
@@ -77,6 +122,11 @@ func main() {
 			next.ServeHTTP(w, r)
 		})
 	})
+
+	// Serve static frontend files without exposing directory listings
+	fileServer := http.FileServer(noDirFileSystem{http.Dir("./frontend")})
+	r.Handle("/*", fileServer)
+
 	// Public routes
 	r.Post("/register", h.Register)
 	r.Post("/login", h.Login)
@@ -84,11 +134,13 @@ func main() {
 		zlog.Info().Msg("Health check requested")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"status":  "healthy",
 			"version": "0.1.0",
 			"uptime":  time.Since(startTime).String(),
-		})
+		}); err != nil {
+			zlog.Error().Err(err).Msg("Failed to encode health check response")
+		}
 	})
 
 	r.Get("/swagger/*", httpSwagger.Handler(
@@ -115,6 +167,19 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
+	// Configure HTTP server with timeouts for security
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
 	zlog.Info().Str("port", port).Msg("Starting server")
-	http.ListenAndServe(":"+port, r)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		zlog.Fatal().Err(err).Msg("Server failed to start")
+	}
 }
