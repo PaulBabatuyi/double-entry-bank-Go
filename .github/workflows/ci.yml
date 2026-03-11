@@ -7,7 +7,7 @@ on:
     branches: [ main, develop ]
 
 env:
-  GO_VERSION: '1.23'
+  GO_VERSION: '1.24'
   POSTGRES_USER: root
   POSTGRES_PASSWORD: secret
   POSTGRES_DB: simple_ledger
@@ -103,7 +103,7 @@ jobs:
           CGO_ENABLED=0 GOOS=linux go build -o ledger cmd/main.go
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ledger-binary
           path: ledger
