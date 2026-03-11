@@ -3,8 +3,13 @@
  * Contains all configuration constants and API endpoint definitions
  */
 
-// API Base URL - Uses current origin to work across environments
-const API_BASE_URL = window.location.origin;
+// API Base URL - Override with VITE_API_BASE_URL environment variable or use current origin
+// For Vercel deployment, backend is hosted at https://double-entry-ledger-api.onrender.com, so we default to that for production
+const API_BASE_URL =
+  window.VITE_API_BASE_URL ||
+  (window.location.hostname === "localhost"
+    ? window.location.origin
+    : "https://double-entry-ledger-api.onrender.com");
 
 // API Endpoints
 const API_ENDPOINTS = {

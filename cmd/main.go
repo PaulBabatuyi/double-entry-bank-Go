@@ -105,9 +105,9 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 
-	// CORS middleware for frontend
+	// CORS middleware for frontend (allows Vercel deployments and local development)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:8080", "http://127.0.0.1:8080"},
+		AllowedOrigins:   []string{"http://localhost:8080", "http://127.0.0.1:8080", "https://*.vercel.app"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Link"},

@@ -10,6 +10,14 @@ Production-grade demonstration of a **double-entry accounting ledger** backend i
 
 This project was built to showcase backend engineering skills relevant to fintech environments — particularly **ledger systems**, **payment processing**, **settlement**, **reliability under concurrency**, and **observability** — aligning closely with roles building scalable financial infrastructure (e.g., fiat deposits/withdrawals, internal ledgers, reconciliation, auditability).
 
+##  Live Demo
+
+- **Frontend (Vercel)**: https://vercel.app
+- **API Docs (Render)**: https://.onrender.com/swagger/index.html  
+- **Health Check**: https://.onrender.com/health
+
+**Want to deploy your own?** See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
+
 ### Features
 
 - Strict **double-entry bookkeeping** (every transaction creates exactly two opposing entries: debit & credit)
@@ -264,4 +272,37 @@ make test           # Run tests with race detector
 make lint           # Run golangci-lint
 make coverage       # Generate & open coverage report
 make server         # Run the API server
+```
+
+---
+
+## 🚀 Deployment
+
+### Production Deployment (Render + Vercel)
+
+Deploy the backend API to **Render** (with PostgreSQL) and the frontend to **Vercel** for a fully production-ready setup with automatic HTTPS, CI/CD, and zero-cost hosting on free tiers.
+
+📖 **Complete deployment guide**: [DEPLOYMENT.md](DEPLOYMENT.md)
+
+**Quick deployment:**
+
+```bash
+# 1. Deploy backend to Render
+./scripts/deploy-render.sh    # Linux/Mac
+# or
+scripts\deploy-render.bat      # Windows
+
+# 2. Deploy frontend to Vercel
+cd frontend
+vercel --prod
+```
+
+**What you get:**
+- ✅ Backend API on Render with PostgreSQL database
+- ✅ Frontend on Vercel with global CDN
+- ✅ Automatic HTTPS on both
+- ✅ Auto-deploy on git push
+- ✅ Free tier hosting (perfect for portfolio)
+
+After deployment, update the "Live Demo" section at the top of this README with your actual URLs!
 ```
