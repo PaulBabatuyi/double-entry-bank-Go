@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-      
+      id-token: write    # <-- ADD THIS LINE
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
