@@ -67,7 +67,7 @@ func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (Account, error)
 
 const getAccountBalance = `-- name: GetAccountBalance :one
 
-SELECT (COALESCE(SUM(credit), 0::NUMERIC) - COALESCE(SUM(debit), 0::NUMERIC))::NUMERIC AS calculated_balance
+SELECT CAST((COALESCE(SUM(credit), 0::NUMERIC) - COALESCE(SUM(debit), 0::NUMERIC)) AS NUMERIC(19,4)) AS calculated_balance
 FROM entries
 WHERE account_id = $1
 `

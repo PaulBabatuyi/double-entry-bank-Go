@@ -19,3 +19,5 @@ sql:
             go_type: "string"
           - column: "accounts.balance"
             go_type: "string"
+          - db_type: "public.operation_type"
+            go_type: "string"

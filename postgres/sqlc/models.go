@@ -6,54 +6,9 @@ package sqlc
 
 import (
 	"database/sql"
-	"database/sql/driver"
-	"fmt"
 
 	"github.com/google/uuid"
 )
-
-type OperationType string
-
-const (
-	OperationTypeDeposit    OperationType = "deposit"
-	OperationTypeWithdrawal OperationType = "withdrawal"
-	OperationTypeTransfer   OperationType = "transfer"
-)
-
-func (e *OperationType) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = OperationType(s)
-	case string:
-		*e = OperationType(s)
-	default:
-		return fmt.Errorf("unsupported scan type for OperationType: %T", src)
-	}
-	return nil
-}
-
-type NullOperationType struct {
-	OperationType OperationType `json:"operation_type"`
-	Valid         bool          `json:"valid"` // Valid is true if OperationType is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullOperationType) Scan(value interface{}) error {
-	if value == nil {
-		ns.OperationType, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.OperationType.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullOperationType) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.OperationType), nil
-}
 
 type Account struct {
 	ID        uuid.UUID     `json:"id"`
@@ -71,7 +26,7 @@ type Entry struct {
 	Debit         string         `json:"debit"`
 	Credit        string         `json:"credit"`
 	TransactionID uuid.UUID      `json:"transaction_id"`
-	OperationType OperationType  `json:"operation_type"`
+	OperationType interface{}    `json:"operation_type"`
 	Description   sql.NullString `json:"description"`
 	CreatedAt     sql.NullTime   `json:"created_at"`
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/db"
 	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/service"
@@ -24,18 +25,6 @@ type Handler struct {
 
 func NewHandler(ledger *service.LedgerService, store *db.Store) *Handler {
 	return &Handler{ledger: ledger, store: store}
-}
-
-func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Error().Err(err).Msg("Failed to encode JSON response")
-	}
-}
-
-func respondError(w http.ResponseWriter, status int, msg string) {
-	respondJSON(w, status, ErrorResponse{Error: msg})
 }
 
 // Register godoc
@@ -355,18 +344,16 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var input struct {
-		Amount string `json:"amount"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	amount, err := decodeAmountFromBody(r)
+	if err != nil {
 		log.Warn().Err(err).Msg("Failed to decode deposit request")
 		respondError(w, http.StatusBadRequest, "invalid input")
 		return
 	}
 
-	err = h.ledger.Deposit(r.Context(), accountID, input.Amount)
+	err = h.ledger.Deposit(r.Context(), accountID, amount)
 	if err != nil {
-		log.Error().Err(err).Str("account_id", accountID.String()).Str("amount", input.Amount).Msg("Deposit failed")
+		log.Error().Err(err).Str("account_id", accountID.String()).Str("amount", amount).Msg("Deposit failed")
 		code := http.StatusInternalServerError
 		if errors.Is(err, service.ErrInvalidAmount) || errors.Is(err, service.ErrCurrencyMismatch) {
 			code = http.StatusBadRequest
@@ -375,7 +362,7 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info().Str("account_id", accountID.String()).Str("user_id", userID.String()).Str("amount", input.Amount).Msg("Deposit successful")
+	log.Info().Str("account_id", accountID.String()).Str("user_id", userID.String()).Str("amount", amount).Msg("Deposit successful")
 	respondJSON(w, http.StatusOK, MessageResponse{Message: "deposit successful"})
 }
 
@@ -431,18 +418,16 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var input struct {
-		Amount string `json:"amount"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	amount, err := decodeAmountFromBody(r)
+	if err != nil {
 		log.Warn().Err(err).Msg("Failed to decode withdrawal request")
 		respondError(w, http.StatusBadRequest, "invalid input")
 		return
 	}
 
-	err = h.ledger.Withdraw(r.Context(), accountID, input.Amount)
+	err = h.ledger.Withdraw(r.Context(), accountID, amount)
 	if err != nil {
-		log.Error().Err(err).Str("account_id", accountID.String()).Str("amount", input.Amount).Msg("Withdrawal failed")
+		log.Error().Err(err).Str("account_id", accountID.String()).Str("amount", amount).Msg("Withdrawal failed")
 		code := http.StatusInternalServerError
 		if errors.Is(err, service.ErrInsufficientFunds) || errors.Is(err, service.ErrInvalidAmount) || errors.Is(err, service.ErrCurrencyMismatch) {
 			code = http.StatusBadRequest
@@ -451,7 +436,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info().Str("account_id", accountID.String()).Str("user_id", userID.String()).Str("amount", input.Amount).Msg("Withdrawal successful")
+	log.Info().Str("account_id", accountID.String()).Str("user_id", userID.String()).Str("amount", amount).Msg("Withdrawal successful")
 	respondJSON(w, http.StatusOK, MessageResponse{Message: "withdrawal successful"})
 }
 
@@ -489,36 +474,88 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var input struct {
-		FromID uuid.UUID `json:"from_id"`
-		ToID   uuid.UUID `json:"to_id"`
-		Amount string    `json:"amount"`
+		FromID        string      `json:"from_id"`
+		ToID          string      `json:"to_id"`
+		FromAccountID string      `json:"from_account_id"`
+		ToAccountID   string      `json:"to_account_id"`
+		Amount        interface{} `json:"amount"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	dec := json.NewDecoder(r.Body)
+	dec.UseNumber()
+	if err := dec.Decode(&input); err != nil {
 		log.Warn().Err(err).Msg("Failed to decode transfer request")
 		respondError(w, http.StatusBadRequest, "invalid input")
 		return
 	}
 
-	fromAcc, err := h.store.Queries.GetAccount(r.Context(), input.FromID)
+	fromIDRaw := strings.TrimSpace(input.FromID)
+	if fromIDRaw == "" {
+		fromIDRaw = strings.TrimSpace(input.FromAccountID)
+	}
+	toIDRaw := strings.TrimSpace(input.ToID)
+	if toIDRaw == "" {
+		toIDRaw = strings.TrimSpace(input.ToAccountID)
+	}
+
+	log.Info().Str("from_id", fromIDRaw).Str("to_id", toIDRaw).Interface("amount", input.Amount).Msg("Transfer request received")
+
+	if fromIDRaw == "" {
+		log.Warn().Msg("Transfer missing from_id")
+		respondError(w, http.StatusBadRequest, "from_id (or from_account_id) is required")
+		return
+	}
+	if toIDRaw == "" {
+		log.Warn().Msg("Transfer missing to_id")
+		respondError(w, http.StatusBadRequest, "to_id (or to_account_id) is required")
+		return
+	}
+
+	fromID, err := uuid.Parse(fromIDRaw)
 	if err != nil {
-		log.Warn().Err(err).Str("from_id", input.FromID.String()).Msg("Transfer failed - from account not found")
+		log.Warn().Err(err).Str("from_id", fromIDRaw).Msg("Invalid from_id UUID format")
+		respondError(w, http.StatusBadRequest, "invalid from_id format")
+		return
+	}
+
+	toID, err := uuid.Parse(toIDRaw)
+	if err != nil {
+		log.Warn().Err(err).Str("to_id", toIDRaw).Msg("Invalid to_id UUID format")
+		respondError(w, http.StatusBadRequest, "invalid to_id format")
+		return
+	}
+
+	if fromID == uuid.Nil || toID == uuid.Nil {
+		respondError(w, http.StatusBadRequest, "from_id and to_id must be valid non-zero UUIDs")
+		return
+	}
+
+	amount, err := normalizeAmountInput(input.Amount)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to parse transfer amount")
+		respondError(w, http.StatusBadRequest, "invalid input")
+		return
+	}
+
+	fromAcc, err := h.store.Queries.GetAccount(r.Context(), fromID)
+	if err != nil {
+		log.Warn().Err(err).Str("from_id", fromID.String()).Msg("Transfer failed - from account not found")
 		respondError(w, http.StatusNotFound, "from account not found")
 		return
 	}
 	if fromAcc.OwnerID.Valid && fromAcc.OwnerID.UUID != userID {
-		log.Warn().Str("from_id", input.FromID.String()).Str("user_id", userID.String()).Msg("Transfer denied - access forbidden")
+		log.Warn().Str("from_id", fromID.String()).Str("user_id", userID.String()).Msg("Transfer denied - access forbidden")
 		respondError(w, http.StatusForbidden, "access denied")
 		return
 	}
 
-	err = h.ledger.Transfer(r.Context(), input.FromID, input.ToID, input.Amount)
+	err = h.ledger.Transfer(r.Context(), fromID, toID, amount)
 	if err != nil {
-		log.Error().Err(err).Str("from_id", input.FromID.String()).Str("to_id", input.ToID.String()).Str("amount", input.Amount).Msg("Transfer failed")
+		log.Error().Err(err).Str("from_id", fromID.String()).Str("to_id", toID.String()).Str("amount", amount).Msg("Transfer failed")
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	log.Info().Str("from_id", input.FromID.String()).Str("to_id", input.ToID.String()).Str("user_id", userID.String()).Str("amount", input.Amount).Msg("Transfer successful")
+	log.Info().Str("from_id", fromID.String()).Str("to_id", toID.String()).Str("user_id", userID.String()).Str("amount", amount).Msg("Transfer successful")
 	respondJSON(w, http.StatusOK, MessageResponse{Message: "transfer successful"})
 }
 
@@ -758,40 +795,4 @@ func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
 		Matched: matched,
 		Message: "Account reconciled successfully",
 	})
-}
-
-func toAccountResponse(acc sqlc.Account) AccountResponse {
-	var ownerID *string
-	if acc.OwnerID.Valid {
-		s := acc.OwnerID.UUID.String()
-		ownerID = &s
-	}
-
-	return AccountResponse{
-		ID:        acc.ID.String(),
-		OwnerID:   ownerID,
-		Name:      acc.Name,
-		Balance:   acc.Balance,
-		Currency:  acc.Currency,
-		IsSystem:  acc.IsSystem,
-		CreatedAt: acc.CreatedAt.Time,
-	}
-}
-
-func toEntryResponse(entry sqlc.Entry) EntryResponse {
-	var description string
-	if entry.Description.Valid {
-		description = entry.Description.String
-	}
-
-	return EntryResponse{
-		ID:            entry.ID.String(),
-		AccountID:     entry.AccountID.String(),
-		Debit:         entry.Debit,
-		Credit:        entry.Credit,
-		TransactionID: entry.TransactionID.String(),
-		OperationType: string(entry.OperationType),
-		Description:   description,
-		CreatedAt:     entry.CreatedAt.Time,
-	}
 }
