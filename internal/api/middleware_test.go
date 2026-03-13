@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -56,11 +55,15 @@ func TestGenerateToken(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, jwtToken)
 
-		// Verify claims
-		claims, err := jwtToken.AsMap(context.TODO())
-		require.NoError(t, err)
-		assert.Equal(t, userID.String(), claims["user_id"])
-		assert.NotNil(t, claims["exp"])
+		// Verify claims via jwx v3 Get(key, *dst) API
+		var userIDVal string
+		claimErr := jwtToken.Get("user_id", &userIDVal)
+		require.NoError(t, claimErr)
+		assert.Equal(t, userID.String(), userIDVal)
+
+		expTime, hasExp := jwtToken.Expiration()
+		assert.True(t, hasExp)
+		assert.False(t, expTime.IsZero())
 	})
 
 	t.Run("error when token auth not initialized", func(t *testing.T) {
@@ -107,9 +110,9 @@ func TestToAccountResponse(t *testing.T) {
 	err := InitTokenAuth("test-secret-key-with-at-least-32-characters-for-testing")
 	require.NoError(t, err)
 
-	t.Run("converts sqlc.Account to AccountResponse", func(t *testing.T) {
-		// This is tested through handler tests
-		// Verifying function is available
-		assert.NotNil(t, testHandler)
+	t.Run("mapper functions are available", func(t *testing.T) {
+		// Verify mapper functions compile and are accessible (behaviour tested via handler tests)
+		assert.NotNil(t, toAccountResponse)
+		assert.NotNil(t, toEntryResponse)
 	})
 }

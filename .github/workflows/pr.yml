@@ -62,14 +62,19 @@ jobs:
             
             if (messages.length > 0) {
               core.warning(messages.join('\n'));
-              
-              // Add a comment to the PR
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: '## PR Size Warning\n\n' + messages.join('\n\n') + '\n\nLarge PRs are harder to review and may delay merge. Consider breaking this into smaller, focused PRs.'
-              });
+
+              const isSameRepoPR = context.payload.pull_request?.head?.repo?.full_name === context.repo.owner + '/' + context.repo.repo;
+              if (isSameRepoPR) {
+                // Add a comment to the PR only when token has write scope.
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: '## PR Size Warning\n\n' + messages.join('\n\n') + '\n\nLarge PRs are harder to review and may delay merge. Consider breaking this into smaller, focused PRs.'
+                });
+              } else {
+                core.info('Skipping PR comment for forked PR (restricted GITHUB_TOKEN permissions).');
+              }
             } else {
               core.info(`✅ PR size looks good: ${totalChanges} lines, ${filesChanged} files`);
             }
@@ -88,19 +93,25 @@ jobs:
             
             if (hasBreakingChange) {
               core.warning('⚠️ This PR contains breaking changes. Ensure proper documentation and migration guides are included.');
-              
-              // Add breaking change label
-              github.rest.issues.addLabels({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                labels: ['breaking-change']
-              });
+
+              const isSameRepoPR = context.payload.pull_request?.head?.repo?.full_name === context.repo.owner + '/' + context.repo.repo;
+              if (isSameRepoPR) {
+                // Add label only when token has write scope.
+                await github.rest.issues.addLabels({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  labels: ['breaking-change']
+                });
+              } else {
+                core.info('Skipping label update for forked PR (restricted GITHUB_TOKEN permissions).');
+              }
             }
 
   auto-label:
     name: Auto Label PR
     runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
       pull-requests: write
@@ -129,7 +140,7 @@ jobs:
         ports:
           - 5433:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U root -d simple_ledger"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -159,7 +170,7 @@ jobs:
         env:
           TEST_DB_URL: postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable
         run: |
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          go test -p 1 -v -race -coverprofile=coverage.out -covermode=atomic ./...
           go tool cover -func=coverage.out -o=coverage.txt
 
       - name: Comment coverage on PR

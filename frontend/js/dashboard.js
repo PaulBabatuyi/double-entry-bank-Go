@@ -75,8 +75,18 @@ const dashboard = {
       idP.className = "text-sm text-gray-400";
       idP.textContent = "ID: " + utils.truncate(account.id);
 
+      const reconcileBtn = document.createElement("button");
+      reconcileBtn.className =
+        "mt-2 text-xs text-blue-300 hover:text-blue-200 transition";
+      reconcileBtn.textContent = "Reconcile";
+      reconcileBtn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await this.reconcileAccount(account.id, account.name);
+      });
+
       leftDiv.appendChild(headerDiv);
       leftDiv.appendChild(idP);
+      leftDiv.appendChild(reconcileBtn);
 
       const rightDiv = document.createElement("div");
       rightDiv.className = "text-right";
@@ -137,6 +147,7 @@ const dashboard = {
   async loadLatestTransactions() {
     const transactionsList = document.getElementById("transactions-list");
     const accounts = state.getAccounts();
+    const statEl = document.getElementById("stat-transactions");
 
     if (accounts.length === 0) {
       transactionsList.innerHTML = "";
@@ -149,21 +160,41 @@ const dashboard = {
       empty.appendChild(emptyIcon);
       empty.appendChild(emptyText);
       transactionsList.appendChild(empty);
+      if (statEl) {
+        statEl.textContent = "0";
+      }
       return;
     }
 
     try {
-      const accountId = accounts[0].id;
-      const { response, data: entries } = await api.getEntries(accountId);
+      const settled = await Promise.allSettled(
+        accounts.map((account) => api.getEntries(account.id)),
+      );
 
-      if (response.ok && entries && entries.length > 0) {
+      const entryResponses = settled
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => result.value);
+
+      const entries = entryResponses
+        .filter(({ response }) => response.ok)
+        .flatMap(({ data }) => (Array.isArray(data) ? data : []));
+
+      if (entries.length > 0) {
         transactionsList.innerHTML = "";
 
         const fragment = document.createDocumentFragment();
 
-        entries.slice(0, 10).forEach((entry) => {
+        // Sort entries by created_at in descending order (newest first)
+        const sortedEntries = [...entries].sort((a, b) => {
+          return new Date(b.created_at) - new Date(a.created_at);
+        });
+
+        sortedEntries.slice(0, 10).forEach((entry) => {
           const isDebit = parseFloat(entry.debit) > 0;
-          const operationText = entry.operation_type || "Transaction";
+          const operationText = entry.operation_type
+            ? entry.operation_type.charAt(0).toUpperCase() +
+              entry.operation_type.slice(1)
+            : "Transaction";
           const dateText = utils.formatDate(entry.created_at);
           const amountValue = isDebit ? entry.debit : entry.credit;
           const amountText =
@@ -224,15 +255,17 @@ const dashboard = {
 
           itemDiv.appendChild(leftDiv);
           itemDiv.appendChild(rightDiv);
+          itemDiv.addEventListener("click", () =>
+            this.viewTransactionDetails(entry.transaction_id),
+          );
 
           fragment.appendChild(itemDiv);
         });
 
         transactionsList.appendChild(fragment);
 
-        const statEl = document.getElementById("stat-transactions");
         if (statEl) {
-          statEl.textContent = entries.length;
+          statEl.textContent = String(entries.length);
         }
       } else {
         transactionsList.innerHTML = "";
@@ -245,9 +278,25 @@ const dashboard = {
         empty.appendChild(emptyIcon);
         empty.appendChild(emptyText);
         transactionsList.appendChild(empty);
+        if (statEl) {
+          statEl.textContent = "0";
+        }
       }
     } catch (error) {
       console.error("Error loading transactions:", error);
+      transactionsList.innerHTML = "";
+      const empty = document.createElement("div");
+      empty.className = "text-center py-8 text-gray-400";
+      const emptyIcon = document.createElement("i");
+      emptyIcon.className = "fas fa-file-invoice text-4xl mb-3";
+      const emptyText = document.createElement("p");
+      emptyText.textContent = "Unable to load transactions";
+      empty.appendChild(emptyIcon);
+      empty.appendChild(emptyText);
+      transactionsList.appendChild(empty);
+      if (statEl) {
+        statEl.textContent = "0";
+      }
     }
   },
 
@@ -278,6 +327,67 @@ const dashboard = {
         `Balance: ${utils.formatCurrency(account.balance)} ${account.currency}`,
         "info",
       );
+    }
+  },
+
+  /**
+   * Trigger account reconciliation and display the result
+   */
+  async reconcileAccount(accountId, accountName) {
+    try {
+      const { response, data } = await api.reconcileAccount(accountId);
+
+      if (response.ok) {
+        ui.showToast(
+          `${accountName} reconciled`,
+          data.matched
+            ? "Ledger and stored balance match"
+            : "Balance mismatch detected",
+          data.matched ? "success" : "error",
+        );
+      } else {
+        ui.showToast(
+          "Reconcile failed",
+          data.error || "Please try again",
+          "error",
+        );
+      }
+    } catch (error) {
+      ui.showToast("Network error", "Please try again", "error");
+    }
+  },
+
+  /**
+   * Fetch full transaction details for a history row
+   */
+  async viewTransactionDetails(transactionId) {
+    try {
+      const { response, data } = await api.getTransaction(transactionId);
+
+      if (response.ok && Array.isArray(data)) {
+        const totalDebit = data.reduce(
+          (sum, entry) => sum + parseFloat(entry.debit || 0),
+          0,
+        );
+        const totalCredit = data.reduce(
+          (sum, entry) => sum + parseFloat(entry.credit || 0),
+          0,
+        );
+
+        ui.showToast(
+          "Transaction details",
+          `${utils.truncate(transactionId)} | debit ${utils.formatCurrency(totalDebit)} | credit ${utils.formatCurrency(totalCredit)}`,
+          "info",
+        );
+      } else {
+        ui.showToast(
+          "Transaction lookup failed",
+          "Could not fetch transaction",
+          "error",
+        );
+      }
+    } catch (error) {
+      ui.showToast("Network error", "Please try again", "error");
     }
   },
 };
