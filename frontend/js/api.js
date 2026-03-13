@@ -20,6 +20,7 @@ const api = {
     }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      cache: "no-store",
       ...options,
       headers,
     });
@@ -110,8 +111,8 @@ const api = {
     return this.request(API_ENDPOINTS.TRANSFERS, {
       method: "POST",
       body: JSON.stringify({
-        from_account_id: fromAccountId,
-        to_account_id: toAccountId,
+        from_id: fromAccountId,
+        to_id: toAccountId,
         amount,
       }),
     });
@@ -122,5 +123,19 @@ const api = {
    */
   async getEntries(accountId) {
     return this.request(API_ENDPOINTS.ENTRIES(accountId));
+  },
+
+  /**
+   * Reconcile an account balance against ledger entries
+   */
+  async reconcileAccount(accountId) {
+    return this.request(API_ENDPOINTS.RECONCILE(accountId));
+  },
+
+  /**
+   * Get a full transaction view by transaction ID
+   */
+  async getTransaction(txId) {
+    return this.request(API_ENDPOINTS.TRANSACTIONS(txId));
   },
 };
