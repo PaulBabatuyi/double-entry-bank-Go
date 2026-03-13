@@ -26,7 +26,7 @@ type Entry struct {
 	Debit         string         `json:"debit"`
 	Credit        string         `json:"credit"`
 	TransactionID uuid.UUID      `json:"transaction_id"`
-	OperationType interface{}    `json:"operation_type"`
+	OperationType string         `json:"operation_type"`
 	Description   sql.NullString `json:"description"`
 	CreatedAt     sql.NullTime   `json:"created_at"`
 }
