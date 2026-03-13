@@ -45,7 +45,7 @@ jobs:
         ports:
           - 5433:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U root -d simple_ledger"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -75,7 +75,7 @@ jobs:
       - name: Run tests
         env:
           TEST_DB_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5433/${{ env.POSTGRES_DB }}?sslmode=disable
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -p 1 -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

@@ -32,7 +32,7 @@ func isSerializationError(err error) bool {
 // ExecTx runs fn inside a transaction and handles rollback on error.
 // Serialization failures (SQLSTATE 40001) are automatically retried up to maxAttempts times.
 func (store *Store) ExecTx(ctx context.Context, fn func(q *sqlc.Queries) error) error {
-	const maxAttempts = 6
+	const maxAttempts = 10
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		lastErr = store.execTxOnce(ctx, fn)
@@ -72,11 +72,14 @@ func (store *Store) execTxOnce(ctx context.Context, fn func(q *sqlc.Queries) err
 	return nil
 }
 
-// retryWait returns an exponential backoff duration for the given attempt (0-based).
+// retryWait returns a capped exponential backoff duration for the given attempt (0-based).
 func retryWait(attempt int) time.Duration {
 	base := 50 * time.Millisecond
 	for i := 0; i < attempt; i++ {
 		base *= 2
+		if base >= time.Second {
+			return time.Second
+		}
 	}
 	return base
 }

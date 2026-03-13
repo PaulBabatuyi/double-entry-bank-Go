@@ -13,7 +13,7 @@ if ! docker compose ps db | grep -q "running"; then
 fi
 
 # Check database health
-until docker compose exec -T db pg_isready -U root > /dev/null 2>&1; do
+until docker compose exec -T db pg_isready -U root -d simple_ledger > /dev/null 2>&1; do
     echo "⏳ Waiting for database to be ready..."
     sleep 2
 done
@@ -31,8 +31,8 @@ echo ""
 echo "🧪 Running tests..."
 echo ""
 
-# Run tests with race detection
-go test -v -race -timeout 30s ./internal/service ./internal/api ./internal/db
+# Run tests with race detection. Limit package parallelism to reduce DB contention in integration tests.
+go test -p 1 -v -race -timeout 30s ./internal/service ./internal/api ./internal/db
 
 echo ""
 echo "✅ All tests completed!"
@@ -41,7 +41,7 @@ echo "✅ All tests completed!"
 if [ "$1" == "--coverage" ]; then
     echo ""
     echo "📊 Running tests with coverage..."
-    go test -coverprofile=coverage.out ./internal/service ./internal/api ./internal/db
+    go test -p 1 -coverprofile=coverage.out ./internal/service ./internal/api ./internal/db
     go tool cover -func=coverage.out
     echo ""
     echo "💡 To view HTML coverage report, run: go tool cover -html=coverage.out"

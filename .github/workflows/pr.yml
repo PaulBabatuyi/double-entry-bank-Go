@@ -129,7 +129,7 @@ jobs:
         ports:
           - 5433:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U root -d simple_ledger"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -159,7 +159,7 @@ jobs:
         env:
           TEST_DB_URL: postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable
         run: |
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          go test -p 1 -v -race -coverprofile=coverage.out -covermode=atomic ./...
           go tool cover -func=coverage.out -o=coverage.txt
 
       - name: Comment coverage on PR
