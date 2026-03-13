@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/postgres/sqlc"
 	"github.com/lib/pq"
@@ -41,12 +42,17 @@ func (store *Store) ExecTx(ctx context.Context, fn func(q *sqlc.Queries) error) 
 		if !isSerializationError(lastErr) {
 			return lastErr
 		}
+		if attempt < maxAttempts-1 {
+			if waitErr := sleepWithContext(ctx, retryWait(attempt)); waitErr != nil {
+				return waitErr
+			}
+		}
 	}
 	return fmt.Errorf("transaction failed after %d attempts due to serialization conflicts: %w", maxAttempts, lastErr)
 }
 
 func (store *Store) execTxOnce(ctx context.Context, fn func(q *sqlc.Queries) error) error {
-	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable}) // good default for money ops
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return err
 	}
@@ -64,4 +70,23 @@ func (store *Store) execTxOnce(ctx context.Context, fn func(q *sqlc.Queries) err
 	}
 
 	return nil
+}
+
+// retryWait returns an exponential backoff duration for the given attempt (0-based).
+func retryWait(attempt int) time.Duration {
+	base := 50 * time.Millisecond
+	for i := 0; i < attempt; i++ {
+		base *= 2
+	}
+	return base
+}
+
+// sleepWithContext waits for d or until ctx is cancelled.
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
 }
