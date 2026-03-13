@@ -13,3 +13,14 @@ ledger.exe
 .env
 correct.md
 DEMO.md
+DEPLOYMENT_CHECKLIST.md
+DEPLOYMENT.md
+scripts*
+.local*
+bin*
+*sh
+*_test.go
+*_test.*
+*.test
+test-results*
+*.log
