@@ -58,7 +58,7 @@ frontend/
 
 ## API Integration
 
-The frontend communicates with the Go backend at `http://localhost:8080`:
+The frontend communicates with the Go backend using the same origin by default (for local and Render deployments):
 
 ### Endpoints Used
 - `POST /register` - Create new user
@@ -91,7 +91,8 @@ currentUser = {
 CORS is required only when the frontend is served from a different origin than the backend (for example, frontend at `http://localhost:3000` and API at `http://localhost:8080`). When both frontend and backend are served from `http://localhost:8080`, CORS is not involved.
 
 ### API Base URL
-Currently hardcoded to `http://localhost:8080`. For production, use environment variables or config file.
+By default, API requests target `window.location.origin`.
+You can override this by setting `window.API_BASE_URL` before `js/config.js` loads.
 
 ### Security Considerations
 - Tokens stored in localStorage (consider httpOnly cookies for production)
