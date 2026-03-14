@@ -4,6 +4,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -54,7 +55,9 @@ func (fs noDirFileSystem) Open(name string) (http.File, error) {
 
 	stat, err := f.Stat()
 	if err != nil {
-		_ = f.Close()
+		if closeErr := f.Close(); closeErr != nil {
+			return nil, errors.Join(err, closeErr)
+		}
 		return nil, err
 	}
 
@@ -62,10 +65,15 @@ func (fs noDirFileSystem) Open(name string) (http.File, error) {
 		// Only permit directories that have an index.html (e.g. the root).
 		idx, idxErr := fs.base.Open(name + "/index.html")
 		if idxErr != nil {
-			_ = f.Close()
+			if closeErr := f.Close(); closeErr != nil {
+				return nil, errors.Join(os.ErrNotExist, closeErr)
+			}
 			return nil, os.ErrNotExist
 		}
-		_ = idx.Close()
+		if closeErr := idx.Close(); closeErr != nil {
+			_ = f.Close()
+			return nil, closeErr
+		}
 	}
 
 	return f, nil
@@ -143,7 +151,11 @@ func main() {
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("Failed to open DB connection")
 	}
-	defer dbConn.Close()
+	defer func() {
+		if closeErr := dbConn.Close(); closeErr != nil {
+			zlog.Error().Err(closeErr).Msg("Failed to close DB connection")
+		}
+	}()
 
 	store := db.NewStore(dbConn)
 	ledgerSvc := service.NewLedgerService(store)

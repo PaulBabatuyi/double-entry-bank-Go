@@ -120,7 +120,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(input.Password)); err != nil {
+	if compareErr := bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(input.Password)); compareErr != nil {
 		log.Warn().Str("email", input.Email).Msg("Login failed - invalid password")
 		respondError(w, http.StatusUnauthorized, "invalid credentials")
 		return
@@ -173,7 +173,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil || input.Name == "" {
+	if decodeErr := json.NewDecoder(r.Body).Decode(&input); decodeErr != nil || input.Name == "" {
 		respondError(w, http.StatusBadRequest, "name required")
 		return
 	}
@@ -480,16 +480,16 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var input struct {
+		Amount        interface{} `json:"amount"`
 		FromID        string      `json:"from_id"`
 		ToID          string      `json:"to_id"`
 		FromAccountID string      `json:"from_account_id"`
 		ToAccountID   string      `json:"to_account_id"`
-		Amount        interface{} `json:"amount"`
 	}
 	dec := json.NewDecoder(r.Body)
 	dec.UseNumber()
-	if err := dec.Decode(&input); err != nil {
-		log.Warn().Err(err).Msg("Failed to decode transfer request")
+	if decodeErr := dec.Decode(&input); decodeErr != nil {
+		log.Warn().Err(decodeErr).Msg("Failed to decode transfer request")
 		respondError(w, http.StatusBadRequest, "invalid input")
 		return
 	}
@@ -624,10 +624,10 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 	limit := 20
 	offset := 0
 
-	if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+	if v, parseErr := strconv.Atoi(limitStr); parseErr == nil && v > 0 {
 		limit = min(v, 100)
 	}
-	if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
+	if v, parseErr := strconv.Atoi(offsetStr); parseErr == nil && v >= 0 {
 		offset = v
 	}
 
