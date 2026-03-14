@@ -19,7 +19,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write    # <-- ADD THIS LINE
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
