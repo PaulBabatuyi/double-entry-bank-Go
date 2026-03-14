@@ -453,6 +453,9 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 // @Failure      403     {object}  ErrorResponse
 // @Router       /transfers [post]
 // @Security     Bearer
+// Transfer handles money transfers between accounts.
+// @Summary Transfer between accounts
+// @Description Transfers funds between accounts. The `amount` field accepts either a JSON number or a JSON string. `from_id`/`to_id` are the preferred fields; `from_account_id`/`to_account_id` are supported as legacy aliases.
 func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
