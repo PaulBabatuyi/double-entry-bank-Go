@@ -2,154 +2,13 @@ name: Pull Request Checks
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
 
 jobs:
-  pr-metadata:
-    name: PR Metadata Check
+  pr-checks:
+    name: PR Build and Lint
     runs-on: ubuntu-latest
-    if: github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Check PR title follows conventional commits
-        uses: amannn/action-semantic-pull-request@v6
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          types: |
-            feat
-            fix
-            docs
-            style
-            refactor
-            perf
-            test
-            build
-            ci
-            chore
-            revert
-          requireScope: false
-          subjectPattern: ^[A-Z].+$
-          subjectPatternError: |
-            The subject "{subject}" found in the pull request title "{title}"
-            must start with an uppercase character.
-
-      - name: Check PR size
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            const additions = pr.additions;
-            const deletions = pr.deletions;
-            const filesChanged = pr.changed_files;
-            
-            const totalChanges = additions + deletions;
-            const maxChanges = 1000;
-            const maxFiles = 30;
-            
-            let messages = [];
-            
-            if (totalChanges > maxChanges) {
-              messages.push(`⚠️ This PR has ${totalChanges} lines changed (limit: ${maxChanges}). Consider breaking it into smaller PRs.`);
-            }
-            
-            if (filesChanged > maxFiles) {
-              messages.push(`⚠️ This PR changes ${filesChanged} files (recommended: < ${maxFiles}). Consider breaking it into smaller PRs.`);
-            }
-            
-            if (messages.length > 0) {
-              core.warning(messages.join('\n'));
-
-              const isSameRepoPR = context.payload.pull_request?.head?.repo?.full_name === context.repo.owner + '/' + context.repo.repo;
-              if (isSameRepoPR) {
-                // Add a comment to the PR only when token has write scope.
-                await github.rest.issues.createComment({
-                  issue_number: context.issue.number,
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  body: '## PR Size Warning\n\n' + messages.join('\n\n') + '\n\nLarge PRs are harder to review and may delay merge. Consider breaking this into smaller, focused PRs.'
-                });
-              } else {
-                core.info('Skipping PR comment for forked PR (restricted GITHUB_TOKEN permissions).');
-              }
-            } else {
-              core.info(`✅ PR size looks good: ${totalChanges} lines, ${filesChanged} files`);
-            }
-
-      - name: Check for breaking changes
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            const body = pr.body || '';
-            const title = pr.title || '';
-            
-            const hasBreakingChange = title.includes('!') || 
-                                     body.toLowerCase().includes('breaking change') ||
-                                     body.includes('BREAKING CHANGE:');
-            
-            if (hasBreakingChange) {
-              core.warning('⚠️ This PR contains breaking changes. Ensure proper documentation and migration guides are included.');
-
-              const isSameRepoPR = context.payload.pull_request?.head?.repo?.full_name === context.repo.owner + '/' + context.repo.repo;
-              if (isSameRepoPR) {
-                // Add label only when token has write scope.
-                await github.rest.issues.addLabels({
-                  issue_number: context.issue.number,
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  labels: ['breaking-change']
-                });
-              } else {
-                core.info('Skipping label update for forked PR (restricted GITHUB_TOKEN permissions).');
-              }
-            }
-
-  auto-label:
-    name: Auto Label PR
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Label PR based on changed files
-        uses: actions/labeler@v5
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          configuration-path: .github/labeler.yml
-
-  comment-coverage:
-    name: Comment Test Coverage
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: root
-          POSTGRES_PASSWORD: secret
-          POSTGRES_DB: simple_ledger
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U root -d simple_ledger"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -157,61 +16,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24'
           cache: true
 
-      - name: Install golang-migrate
-        run: |
-          curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate.linux-amd64.tar.gz | tar xvz
-          sudo mv migrate /usr/local/bin/
+      - name: Build
+        run: go build ./...
 
-      - name: Run migrations
-        env:
-          DATABASE_URL: postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable
-        run: |
-          migrate -path postgres/migrations/ -database "$DATABASE_URL" -verbose up
-
-      - name: Run tests with coverage
-        env:
-          TEST_DB_URL: postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable
-        run: |
-          go test -p 1 -v -race -coverprofile=coverage.out -covermode=atomic ./...
-          go tool cover -func=coverage.out -o=coverage.txt
-
-      - name: Comment coverage on PR
-        uses: actions/github-script@v8
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
         with:
-          script: |
-            const fs = require('fs');
-            const coverage = fs.readFileSync('coverage.txt', 'utf8');
-            
-            const body = `## Test Coverage Report\n\n\`\`\`\n${coverage}\n\`\`\`\n\n*Coverage report generated for commit ${context.sha.substring(0, 7)}*`;
-            
-            // Find existing coverage comment
-            const comments = await github.rest.issues.listComments({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            });
-            
-            const existingComment = comments.data.find(comment => 
-              comment.user.type === 'Bot' && comment.body.includes('Test Coverage Report')
-            );
-            
-            if (existingComment) {
-              // Update existing comment
-              await github.rest.issues.updateComment({
-                comment_id: existingComment.id,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: body
-              });
-            } else {
-              // Create new comment
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: body
-              });
-            }
+          version: latest
+          args: --timeout=5m
