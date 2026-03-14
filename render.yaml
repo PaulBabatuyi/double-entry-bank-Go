@@ -1,5 +1,5 @@
 services:
-  # Backend API Service
+  # Backend API + frontend static files (served from the same Go service)
   - type: web
     name: double-entry-ledger-api
     runtime: docker
@@ -10,6 +10,8 @@ services:
     envVars:
       - key: PORT
         value: 8080
+      - key: CORS_ALLOWED_ORIGINS
+        value: http://localhost:8080,http://127.0.0.1:8080
       - key: JWT_SECRET
         generateValue: true
       - key: DB_URL
