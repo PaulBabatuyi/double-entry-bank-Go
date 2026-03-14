@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/postgres/sqlc"
 	"github.com/lib/pq"
+
+	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/postgres/sqlc"
 )
 
 // Store wraps generated queries and transaction helpers.

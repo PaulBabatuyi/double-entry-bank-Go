@@ -71,7 +71,9 @@ func (fs noDirFileSystem) Open(name string) (http.File, error) {
 			return nil, os.ErrNotExist
 		}
 		if closeErr := idx.Close(); closeErr != nil {
-			_ = f.Close()
+			if fileCloseErr := f.Close(); fileCloseErr != nil {
+				return nil, errors.Join(closeErr, fileCloseErr)
+			}
 			return nil, closeErr
 		}
 	}

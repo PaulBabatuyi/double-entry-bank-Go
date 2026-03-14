@@ -7,11 +7,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/db"
-	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/postgres/sqlc"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"github.com/shopspring/decimal"
+
+	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/db"
+	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/postgres/sqlc"
 )
 
 var (

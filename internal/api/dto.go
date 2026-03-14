@@ -3,6 +3,8 @@ package api
 import "time"
 
 // AccountResponse represents an account returned by the API.
+//
+//nolint:govet // This layout keeps the JSON response fields grouped for readability.
 type AccountResponse struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`

@@ -8,15 +8,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/db"
-	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/service"
-	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/postgres/sqlc"
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/db"
+	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/internal/service"
+	"github.com/PaulBabatuyi/Double-Entry-Bank-Go/postgres/sqlc"
 )
 
 // Handler serves HTTP requests backed by the ledger and store layers.
