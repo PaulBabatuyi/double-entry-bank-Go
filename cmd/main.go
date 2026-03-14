@@ -4,6 +4,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -54,7 +55,9 @@ func (fs noDirFileSystem) Open(name string) (http.File, error) {
 
 	stat, err := f.Stat()
 	if err != nil {
-		_ = f.Close()
+		if closeErr := f.Close(); closeErr != nil {
+			return nil, errors.Join(err, closeErr)
+		}
 		return nil, err
 	}
 
@@ -62,10 +65,15 @@ func (fs noDirFileSystem) Open(name string) (http.File, error) {
 		// Only permit directories that have an index.html (e.g. the root).
 		idx, idxErr := fs.base.Open(name + "/index.html")
 		if idxErr != nil {
-			_ = f.Close()
+			if closeErr := f.Close(); closeErr != nil {
+				return nil, errors.Join(os.ErrNotExist, closeErr)
+			}
 			return nil, os.ErrNotExist
 		}
-		_ = idx.Close()
+		if closeErr := idx.Close(); closeErr != nil {
+			_ = f.Close()
+			return nil, closeErr
+		}
 	}
 
 	return f, nil
@@ -93,6 +101,35 @@ func parseAllowedOrigins() []string {
 	return allowed
 }
 
+func resolveDBURL() string {
+	connStr := strings.TrimSpace(os.Getenv("DB_URL"))
+
+	fallbackVars := []string{"INTERNAL_DATABASE_URL", "RENDER_DATABASE_URL", "DATABASE_URL"}
+
+	if connStr == "" {
+		for _, envVar := range fallbackVars {
+			if value := strings.TrimSpace(os.Getenv(envVar)); value != "" {
+				return value
+			}
+		}
+
+		// Default connection string for local development only.
+		return "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable" // #nosec G101 - Local development default
+	}
+
+	lower := strings.ToLower(connStr)
+	isLocalHostURL := strings.Contains(lower, "@localhost:") || strings.Contains(lower, "@127.0.0.1:") || strings.Contains(lower, "@[::1]:")
+	if isLocalHostURL {
+		for _, envVar := range fallbackVars {
+			if value := strings.TrimSpace(os.Getenv(envVar)); value != "" {
+				return value
+			}
+		}
+	}
+
+	return connStr
+}
+
 func main() {
 	startTime := time.Now()
 
@@ -106,18 +143,19 @@ func main() {
 		zlog.Fatal().Err(err).Msg("Failed to initialize JWT auth")
 	}
 
-	connStr := os.Getenv("DB_URL")
-	if connStr == "" {
-		// Default connection string for local development only
-		// In production, always set DB_URL environment variable
-		connStr = "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable" // #nosec G101 - This is only used for local development
-		zlog.Warn().Msg("Using default DB_URL – set DB_URL in .env for production")
+	connStr := resolveDBURL()
+	if strings.Contains(connStr, "@localhost:") || strings.Contains(connStr, "@127.0.0.1:") || strings.Contains(connStr, "@[::1]:") {
+		zlog.Warn().Msg("Using localhost DB_URL; this is only valid for local development")
 	}
 	dbConn, err := sql.Open("postgres", connStr)
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("Failed to open DB connection")
 	}
-	defer dbConn.Close()
+	defer func() {
+		if closeErr := dbConn.Close(); closeErr != nil {
+			zlog.Error().Err(closeErr).Msg("Failed to close DB connection")
+		}
+	}()
 
 	store := db.NewStore(dbConn)
 	ledgerSvc := service.NewLedgerService(store)

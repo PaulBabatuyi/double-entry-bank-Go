@@ -16,15 +16,15 @@ import (
 
 var (
 	// ErrInsufficientFunds is returned when an account balance cannot cover a debit.
-	ErrInsufficientFunds   = errors.New("insufficient funds")
+	ErrInsufficientFunds = errors.New("insufficient funds")
 	// ErrSameAccountTransfer is returned when a transfer uses the same source and destination account.
 	ErrSameAccountTransfer = errors.New("cannot transfer to the same account")
 	// ErrInvalidAmount is returned when the provided amount is zero or negative.
-	ErrInvalidAmount       = errors.New("amount must be positive")
+	ErrInvalidAmount = errors.New("amount must be positive")
 	// ErrCurrencyMismatch is returned when accounts involved in an operation use different currencies.
-	ErrCurrencyMismatch    = errors.New("currency mismatch")
+	ErrCurrencyMismatch = errors.New("currency mismatch")
 	// ErrAccountNotFound is returned when an expected account does not exist.
-	ErrAccountNotFound     = errors.New("account not found")
+	ErrAccountNotFound = errors.New("account not found")
 )
 
 // LedgerService coordinates double-entry operations on accounts.
@@ -293,12 +293,12 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 
 // ReconcileAccount verifies stored balance == SUM(credits) - SUM(debits)
 func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUID) (bool, error) {
-	account, err := s.store.Queries.GetAccount(ctx, accountID)
+	account, err := s.store.GetAccount(ctx, accountID)
 	if err != nil {
 		return false, fmt.Errorf("account not found: %w", err)
 	}
 
-	calculatedStr, err := s.store.Queries.GetAccountBalance(ctx, accountID)
+	calculatedStr, err := s.store.GetAccountBalance(ctx, accountID)
 	if err != nil {
 		return false, fmt.Errorf("failed to calculate balance: %w", err)
 	}
