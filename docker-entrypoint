@@ -2,7 +2,9 @@
 
 set -eu
 
-if [ -n "${DB_URL:-}" ]; then
+if [ "${RUN_DB_MIGRATIONS_ON_START:-true}" != "true" ]; then
+    echo "RUN_DB_MIGRATIONS_ON_START is not 'true'; skipping migrations"
+elif [ -n "${DB_URL:-}" ]; then
     echo "Running database migrations..."
 
     # golang-migrate expects postgres:// (not postgresql://)
