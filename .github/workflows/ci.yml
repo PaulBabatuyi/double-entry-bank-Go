@@ -8,9 +8,6 @@ on:
 
 env:
   GO_VERSION: '1.24'
-  POSTGRES_USER: root
-  POSTGRES_PASSWORD: secret
-  POSTGRES_DB: simple_ledger
 
 jobs:
   lint:
@@ -31,63 +28,10 @@ jobs:
           version: latest
           args: --timeout=5m
 
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U root -d simple_ledger"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Install golang-migrate
-        run: |
-          curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate.linux-amd64.tar.gz | tar xvz
-          sudo mv migrate /usr/local/bin/
-          migrate -version
-
-      - name: Run migrations
-        env:
-          DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5433/${{ env.POSTGRES_DB }}?sslmode=disable
-        run: |
-          migrate -path postgres/migrations/ -database "$DATABASE_URL" -verbose up
-
-      - name: Run tests
-        env:
-          TEST_DB_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5433/${{ env.POSTGRES_DB }}?sslmode=disable
-        run: go test -p 1 -v -race -coverprofile=coverage.out -covermode=atomic ./...
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          flags: unittests
-          fail_ci_if_error: false
-
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [lint]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6

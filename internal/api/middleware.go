@@ -10,14 +10,17 @@ import (
 )
 
 var (
+	// TokenAuth holds the JWT authenticator used by the API package.
 	TokenAuth *jwtauth.JWTAuth
 )
 
+// InitTokenAuthFromEnv initializes JWT auth using the JWT_SECRET environment variable.
 func InitTokenAuthFromEnv() error {
 	secret := os.Getenv("JWT_SECRET")
 	return InitTokenAuth(secret)
 }
 
+// InitTokenAuth initializes JWT auth with the provided secret.
 func InitTokenAuth(secret string) error {
 	if secret == "" {
 		return errors.New("JWT_SECRET environment variable is required")
@@ -31,7 +34,7 @@ func InitTokenAuth(secret string) error {
 	return nil
 }
 
-// GenerateToken for login
+// GenerateToken creates a signed JWT for the given user ID.
 func GenerateToken(userID uuid.UUID) (string, error) {
 	if TokenAuth == nil {
 		return "", errors.New("token auth is not initialized")

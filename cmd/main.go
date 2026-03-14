@@ -1,3 +1,4 @@
+// Package main wires together the HTTP server, database store, and middleware.
 package main
 
 import (
@@ -153,7 +154,7 @@ func main() {
 	// Public routes
 	r.Post("/register", h.Register)
 	r.Post("/login", h.Login)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		zlog.Info().Msg("Health check requested")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
