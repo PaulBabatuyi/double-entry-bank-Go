@@ -1,3 +1,4 @@
+// Package api exposes HTTP handlers, middleware, and response types for the ledger service.
 package api
 
 import (
@@ -18,11 +19,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Handler serves HTTP requests backed by the ledger and store layers.
 type Handler struct {
 	ledger *service.LedgerService
 	store  *db.Store
 }
 
+// NewHandler constructs a Handler with the required service and persistence dependencies.
 func NewHandler(ledger *service.LedgerService, store *db.Store) *Handler {
 	return &Handler{ledger: ledger, store: store}
 }
@@ -62,7 +65,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.Queries.CreateUser(r.Context(), sqlc.CreateUserParams{
+	user, err := h.store.CreateUser(r.Context(), sqlc.CreateUserParams{
 		Email:          input.Email,
 		HashedPassword: string(hashed),
 	})
@@ -110,7 +113,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.Queries.GetUserByEmail(r.Context(), input.Email)
+	user, err := h.store.GetUserByEmail(r.Context(), input.Email)
 	if err != nil {
 		log.Warn().Err(err).Str("email", input.Email).Msg("Login failed - user not found")
 		respondError(w, http.StatusUnauthorized, "invalid credentials")
@@ -175,7 +178,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	acc, err := h.store.Queries.CreateAccount(r.Context(), sqlc.CreateAccountParams{
+	acc, err := h.store.CreateAccount(r.Context(), sqlc.CreateAccountParams{
 		OwnerID:  uuid.NullUUID{UUID: userID, Valid: true},
 		Name:     input.Name,
 		Currency: "NGN",
@@ -221,7 +224,7 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accounts, err := h.store.Queries.ListAccountsByOwner(r.Context(), uuid.NullUUID{UUID: userID, Valid: true})
+	accounts, err := h.store.ListAccountsByOwner(r.Context(), uuid.NullUUID{UUID: userID, Valid: true})
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to list accounts")
 		respondError(w, http.StatusInternalServerError, "failed to list accounts")
@@ -276,7 +279,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
+	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Account not found")
 		respondError(w, http.StatusNotFound, "account not found")
@@ -332,7 +335,7 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
+	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Deposit failed - account not found")
 		respondError(w, http.StatusNotFound, "account not found")
@@ -406,7 +409,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
+	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Withdrawal failed - account not found")
 		respondError(w, http.StatusNotFound, "account not found")
@@ -539,7 +542,7 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fromAcc, err := h.store.Queries.GetAccount(r.Context(), fromID)
+	fromAcc, err := h.store.GetAccount(r.Context(), fromID)
 	if err != nil {
 		log.Warn().Err(err).Str("from_id", fromID.String()).Msg("Transfer failed - from account not found")
 		respondError(w, http.StatusNotFound, "from account not found")
@@ -603,7 +606,7 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
+	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Get entries failed - account not found")
 		respondError(w, http.StatusNotFound, "account not found")
@@ -634,7 +637,7 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entries, err := h.store.Queries.ListEntriesByAccount(r.Context(), sqlc.ListEntriesByAccountParams{
+	entries, err := h.store.ListEntriesByAccount(r.Context(), sqlc.ListEntriesByAccountParams{
 		AccountID: accountID,
 		Limit:     int32(limit),
 		Offset:    int32(offset),
@@ -693,7 +696,7 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entries, err := h.store.Queries.ListEntriesByTransaction(r.Context(), transactionID)
+	entries, err := h.store.ListEntriesByTransaction(r.Context(), transactionID)
 	if err != nil {
 		log.Error().Err(err).Str("transaction_id", transactionID.String()).Msg("Failed to fetch transaction")
 		respondError(w, http.StatusInternalServerError, "failed to fetch transaction")
@@ -708,7 +711,7 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 
 	authorized := false
 	for _, entry := range entries {
-		acc, err := h.store.Queries.GetAccount(r.Context(), entry.AccountID)
+		acc, err := h.store.GetAccount(r.Context(), entry.AccountID)
 		if err != nil {
 			log.Error().Err(err).Str("account_id", entry.AccountID.String()).Msg("Failed to authorize transaction")
 			respondError(w, http.StatusInternalServerError, "failed to authorize transaction")
@@ -774,7 +777,7 @@ func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	acc, err := h.store.Queries.GetAccount(r.Context(), accountID)
+	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Reconcile failed - account not found")
 		respondError(w, http.StatusNotFound, "account not found")

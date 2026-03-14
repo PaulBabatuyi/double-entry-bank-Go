@@ -12,9 +12,9 @@ This project was built to showcase backend engineering skills relevant to fintec
 
 ##  Live Demo
 
-- **Frontend (Vercel)**: https://vercel.app
-- **API Docs (Render)**: https://.onrender.com/swagger/index.html  
-- **Health Check**: https://.onrender.com/health
+- **Frontend (Render)**: https://your-service-name.onrender.com
+- **API Docs (Render)**: https://your-service-name.onrender.com/swagger/index.html  
+- **Health Check**: https://your-service-name.onrender.com/health
 
 **Want to deploy your own?** See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
 
@@ -278,31 +278,26 @@ make server         # Run the API server
 
 ## 🚀 Deployment
 
-### Production Deployment (Render + Vercel)
+### Production Deployment (Render)
 
-Deploy the backend API to **Render** (with PostgreSQL) and the frontend to **Vercel** for a fully production-ready setup with automatic HTTPS, CI/CD, and zero-cost hosting on free tiers.
+Deploy the backend API and frontend together to **Render** (with PostgreSQL) for a simple production setup with automatic HTTPS and CI/CD.
 
 📖 **Complete deployment guide**: [DEPLOYMENT.md](DEPLOYMENT.md)
 
 **Quick deployment:**
 
 ```bash
-# 1. Deploy backend to Render
+# 1. Deploy to Render
 ./scripts/deploy-render.sh    # Linux/Mac
 # or
 scripts\deploy-render.bat      # Windows
-
-# 2. Deploy frontend to Vercel
-cd frontend
-vercel --prod
 ```
 
 **What you get:**
 - ✅ Backend API on Render with PostgreSQL database
-- ✅ Frontend on Vercel with global CDN
-- ✅ Automatic HTTPS on both
+- ✅ Frontend served from the same Render service
+- ✅ Automatic HTTPS
 - ✅ Auto-deploy on git push
 - ✅ Free tier hosting (perfect for portfolio)
 
 After deployment, update the "Live Demo" section at the top of this README with your actual URLs!
-```

@@ -1,3 +1,4 @@
+// Package main wires together the HTTP server, database store, and middleware.
 package main
 
 import (
@@ -5,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/PaulBabatuyi/Double-Entry-Bank-Go/docs"
@@ -69,6 +71,28 @@ func (fs noDirFileSystem) Open(name string) (http.File, error) {
 	return f, nil
 }
 
+func parseAllowedOrigins() []string {
+	origins := os.Getenv("CORS_ALLOWED_ORIGINS")
+	if strings.TrimSpace(origins) == "" {
+		return []string{"http://localhost:8080", "http://127.0.0.1:8080"}
+	}
+
+	parts := strings.Split(origins, ",")
+	allowed := make([]string, 0, len(parts))
+	for _, origin := range parts {
+		trimmed := strings.TrimSpace(origin)
+		if trimmed != "" {
+			allowed = append(allowed, trimmed)
+		}
+	}
+
+	if len(allowed) == 0 {
+		return []string{"http://localhost:8080", "http://127.0.0.1:8080"}
+	}
+
+	return allowed
+}
+
 func main() {
 	startTime := time.Now()
 
@@ -105,9 +129,9 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 
-	// CORS middleware for frontend (allows Vercel deployments and local development)
+	// CORS middleware for separate frontend deployments and local development.
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:8080", "http://127.0.0.1:8080", "https://*.vercel.app"},
+		AllowedOrigins:   parseAllowedOrigins(),
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Link"},
@@ -130,7 +154,7 @@ func main() {
 	// Public routes
 	r.Post("/register", h.Register)
 	r.Post("/login", h.Login)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		zlog.Info().Msg("Health check requested")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

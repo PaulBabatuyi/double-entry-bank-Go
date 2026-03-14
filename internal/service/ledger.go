@@ -1,3 +1,4 @@
+// Package service contains the core ledger business logic.
 package service
 
 import (
@@ -14,17 +15,24 @@ import (
 )
 
 var (
+	// ErrInsufficientFunds is returned when an account balance cannot cover a debit.
 	ErrInsufficientFunds   = errors.New("insufficient funds")
+	// ErrSameAccountTransfer is returned when a transfer uses the same source and destination account.
 	ErrSameAccountTransfer = errors.New("cannot transfer to the same account")
+	// ErrInvalidAmount is returned when the provided amount is zero or negative.
 	ErrInvalidAmount       = errors.New("amount must be positive")
+	// ErrCurrencyMismatch is returned when accounts involved in an operation use different currencies.
 	ErrCurrencyMismatch    = errors.New("currency mismatch")
+	// ErrAccountNotFound is returned when an expected account does not exist.
 	ErrAccountNotFound     = errors.New("account not found")
 )
 
+// LedgerService coordinates double-entry operations on accounts.
 type LedgerService struct {
 	store *db.Store
 }
 
+// NewLedgerService constructs a LedgerService backed by the provided store.
 func NewLedgerService(store *db.Store) *LedgerService {
 	return &LedgerService{store: store}
 }

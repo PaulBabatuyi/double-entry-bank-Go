@@ -1,3 +1,4 @@
+// Package db provides transaction-aware access to sqlc queries.
 package db
 
 import (
@@ -11,11 +12,13 @@ import (
 	"github.com/lib/pq"
 )
 
+// Store wraps generated queries and transaction helpers.
 type Store struct {
 	*sqlc.Queries
 	db *sql.DB
 }
 
+// NewStore constructs a Store backed by the given database connection.
 func NewStore(db *sql.DB) *Store {
 	return &Store{
 		Queries: sqlc.New(db),
