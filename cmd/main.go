@@ -93,6 +93,35 @@ func parseAllowedOrigins() []string {
 	return allowed
 }
 
+func resolveDBURL() string {
+	connStr := strings.TrimSpace(os.Getenv("DB_URL"))
+
+	fallbackVars := []string{"INTERNAL_DATABASE_URL", "RENDER_DATABASE_URL", "DATABASE_URL"}
+
+	if connStr == "" {
+		for _, envVar := range fallbackVars {
+			if value := strings.TrimSpace(os.Getenv(envVar)); value != "" {
+				return value
+			}
+		}
+
+		// Default connection string for local development only.
+		return "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable" // #nosec G101 - Local development default
+	}
+
+	lower := strings.ToLower(connStr)
+	isLocalHostURL := strings.Contains(lower, "@localhost:") || strings.Contains(lower, "@127.0.0.1:") || strings.Contains(lower, "@[::1]:")
+	if isLocalHostURL {
+		for _, envVar := range fallbackVars {
+			if value := strings.TrimSpace(os.Getenv(envVar)); value != "" {
+				return value
+			}
+		}
+	}
+
+	return connStr
+}
+
 func main() {
 	startTime := time.Now()
 
@@ -106,12 +135,9 @@ func main() {
 		zlog.Fatal().Err(err).Msg("Failed to initialize JWT auth")
 	}
 
-	connStr := os.Getenv("DB_URL")
-	if connStr == "" {
-		// Default connection string for local development only
-		// In production, always set DB_URL environment variable
-		connStr = "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable" // #nosec G101 - This is only used for local development
-		zlog.Warn().Msg("Using default DB_URL – set DB_URL in .env for production")
+	connStr := resolveDBURL()
+	if strings.Contains(connStr, "@localhost:") || strings.Contains(connStr, "@127.0.0.1:") || strings.Contains(connStr, "@[::1]:") {
+		zlog.Warn().Msg("Using localhost DB_URL; this is only valid for local development")
 	}
 	dbConn, err := sql.Open("postgres", connStr)
 	if err != nil {
