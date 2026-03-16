@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/ledger 
 RUN GOBIN=/out go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.3
 
 # Minimal runtime image
-FROM alpine:3.21
+FROM alpine:3.23
 WORKDIR /app
 
 COPY --from=builder /out/ledger /usr/local/bin/ledger
