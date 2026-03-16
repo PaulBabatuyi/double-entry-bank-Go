@@ -13,7 +13,7 @@ This project was built to showcase backend engineering skills relevant to fintec
 ##  Live Demo
 
 - **Frontend (Render)**: https://double-entry-bank-go.onrender.com
-- **API Docs (Render)**: https://your-service-name.onrender.com/swagger/index.html  
+- **API Docs (Render)**: [https://your-service-name.onrender.com](https://double-entry-bank-go.onrender.com)/swagger/index.html  
 - **Health Check**: https://double-entry-bank-go.onrender.com/health
 
 **Want to deploy your own?** See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
