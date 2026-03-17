@@ -181,7 +181,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	acc, err := h.store.CreateAccount(r.Context(), sqlc.CreateAccountParams{
 		OwnerID:  uuid.NullUUID{UUID: userID, Valid: true},
 		Name:     input.Name,
-		Currency: "NGN",
+		Currency: "USD",
 		IsSystem: false,
 	})
 	if err != nil {

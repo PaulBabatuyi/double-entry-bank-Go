@@ -24,3 +24,6 @@ bin*
 *.test
 test-results*
 *.log
+freecodecamp*
+Tutorial*
+article*

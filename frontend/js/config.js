@@ -27,9 +27,9 @@ const TOAST_DURATION = 4000;
 
 // Currency settings
 const CURRENCY = {
-  CODE: "NGN",
-  SYMBOL: "₦",
-  LOCALE: "en-NG",
+  CODE: "USD",
+  SYMBOL: "$",
+  LOCALE: "en-US",
 };
 
 // Local storage keys
