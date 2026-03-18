@@ -14,9 +14,13 @@ This project was built to showcase backend engineering skills relevant to fintec
 
 - **Frontend (Render)**: https://double-entry-bank-go.onrender.com
 - **API Docs (Render)**: https://double-entry-bank-go.onrender.com/swagger/index.html  
+
+https://github.com/PaulBabatuyi/double-entry-bank-Go/blob/main/internal/public/swagger-Go-bank.png
+
 - **Health Check**: https://double-entry-bank-go.onrender.com/health
 
 **Want to deploy your own?** See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
+
 
 ### Features
 
