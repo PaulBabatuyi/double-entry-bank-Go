@@ -9,7 +9,7 @@ go.work
 ledger
 ledger.exe
 *.exe
-
+*.exe*
 .env
 correct.md
 DEMO.md
@@ -19,9 +19,6 @@ scripts*
 .local*
 bin*
 *sh
-*_test.go
-*_test.*
-*.test
 test-results*
 *.log
 freecodecamp*
