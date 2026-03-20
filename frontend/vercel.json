@@ -1,0 +1,16 @@
+{
+  "buildCommand": "npm run build || true",
+  "outputDirectory": ".",
+  "trailingSlash": false,
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "VITE_API_BASE_URL": "@api_base_url"
+  },
+  "envPrefix": "VITE_"
+}

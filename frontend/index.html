@@ -264,6 +264,14 @@
     </div>
 
     <!-- Load JavaScript modules in dependency order -->
+    <!-- Set API base URL from environment (Vercel) or default to current origin -->
+    <script>
+        if (typeof window.API_BASE_URL === 'undefined') {
+            // Check for Vercel environment variable (VITE_API_BASE_URL)
+            window.API_BASE_URL = (window.VITE_API_BASE_URL || '').trim() || window.location.origin;
+        }
+        console.log('API_BASE_URL configured to:', window.API_BASE_URL);
+    </script>
     <script src="js/config.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/state.js"></script>

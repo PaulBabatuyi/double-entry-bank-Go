@@ -1,0 +1,20 @@
+# Exclude backend and Go-specific files from Vercel deployment
+cmd/
+internal/
+postgres/
+scripts/
+docs/
+.github/
+go.mod
+go.sum
+Dockerfile
+docker-compose.yml
+docker-entrypoint
+Makefile
+*.sh
+sqlc.yaml
+render.yaml
+DEPLOYMENT.md
+DEPLOYMENT_CHECKLIST.md
+FRONTEND_SUMMARY.md
+correct.md
