@@ -1,5 +1,5 @@
 services:
-  # Backend API + frontend static files (served from the same Go service)
+  # Backend API
   - type: web
     name: double-entry-ledger-api
     runtime: docker

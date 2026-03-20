@@ -21,7 +21,7 @@ done
 echo "✅ Database is ready"
 
 # Set test database URL
-export TEST_DB_URL="postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable"
+export TEST_DB_URL="postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable"
 
 # Run migrations if needed
 echo "📦 Running migrations..."
