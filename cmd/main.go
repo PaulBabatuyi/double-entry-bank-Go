@@ -26,6 +26,7 @@ import (
 )
 
 func initLogger() {
+	// Use millisecond precision in logs so request timing is easy to follow in demos.
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
 	zlog.Info().Msg("Logger initialized")
@@ -42,6 +43,7 @@ func initLogger() {
 // @description Type "Bearer" followed by a space and JWT token
 
 func parseAllowedOrigins() []string {
+	// Allow explicit runtime configuration; defaults are safe for hosted frontend + local dev.
 	origins := os.Getenv("CORS_ALLOWED_ORIGINS")
 	if strings.TrimSpace(origins) == "" {
 		return []string{
@@ -56,6 +58,7 @@ func parseAllowedOrigins() []string {
 	parts := strings.Split(origins, ",")
 	allowed := make([]string, 0, len(parts))
 	for _, origin := range parts {
+		// Normalize each origin to avoid accidental whitespace mismatches.
 		trimmed := strings.TrimSpace(origin)
 		if trimmed != "" {
 			allowed = append(allowed, trimmed)
@@ -76,11 +79,13 @@ func parseAllowedOrigins() []string {
 }
 
 func resolveDBURL() string {
+	// Prefer DB_URL, but support platform-specific fallbacks for easier deployment.
 	connStr := strings.TrimSpace(os.Getenv("DB_URL"))
 
 	fallbackVars := []string{"INTERNAL_DATABASE_URL", "RENDER_DATABASE_URL", "DATABASE_URL"}
 
 	if connStr == "" {
+		// If DB_URL is absent, try common provider-specific environment variables.
 		for _, envVar := range fallbackVars {
 			if value := strings.TrimSpace(os.Getenv(envVar)); value != "" {
 				return value
@@ -100,6 +105,7 @@ func resolveDBURL() string {
 	}
 
 	lower := strings.ToLower(connStr)
+	// Localhost DB URLs are invalid in cloud runtimes; attempt safe fallback automatically.
 	isLocalHostURL := strings.Contains(lower, "@localhost:") || strings.Contains(lower, "@127.0.0.1:") || strings.Contains(lower, "@[::1]:")
 	if isLocalHostURL {
 		for _, envVar := range fallbackVars {
@@ -120,6 +126,7 @@ func resolveDBURL() string {
 }
 
 func main() {
+	// Capture startup time so health endpoint can report uptime.
 	startTime := time.Now()
 
 	initLogger()
@@ -132,6 +139,7 @@ func main() {
 		zlog.Fatal().Err(err).Msg("Failed to initialize JWT auth")
 	}
 
+	// Build DB connection string and validate connectivity before serving traffic.
 	connStr := resolveDBURL()
 	if strings.Contains(connStr, "@localhost:") || strings.Contains(connStr, "@127.0.0.1:") || strings.Contains(connStr, "@[::1]:") {
 		zlog.Warn().Msg("Using localhost DB_URL; this is only valid for local development")
@@ -157,6 +165,7 @@ func main() {
 	store := db.NewStore(dbConn)
 	ledgerSvc := service.NewLedgerService(store)
 
+	// Wire HTTP handlers with service and persistence dependencies.
 	h := api.NewHandler(ledgerSvc, store)
 
 	r := chi.NewRouter()
@@ -176,6 +185,7 @@ func main() {
 
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Attach request metadata to logs for traceability during debugging.
 			reqID := middleware.GetReqID(r.Context())
 			zlog.Info().Str("request_id", reqID).Str("path", r.URL.Path).Msg("Request received")
 			next.ServeHTTP(w, r)
@@ -186,6 +196,7 @@ func main() {
 	r.Post("/register", h.Register)
 	r.Post("/login", h.Login)
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+		// Health returns service liveness plus lightweight runtime metadata.
 		zlog.Info().Msg("Health check requested")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -204,6 +215,7 @@ func main() {
 	))
 	// Protected routes
 	r.Group(func(r chi.Router) {
+		// Apply JWT verification only to protected business endpoints.
 		r.Use(jwtauth.Verifier(api.TokenAuth))
 		r.Use(jwtauth.Authenticator(api.TokenAuth))
 
@@ -220,6 +232,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
+		// Default port for local development when PORT is not injected.
 		port = "8080"
 	}
 

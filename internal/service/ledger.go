@@ -40,12 +40,14 @@ func NewLedgerService(store *db.Store) *LedgerService {
 
 // Deposit external money into user account
 func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amountStr string) error {
+	// Step 1: Validate amount once at service boundary.
 	amount, err := validatePositiveAmount(amountStr)
 	if err != nil {
 		return err
 	}
 
 	return s.store.ExecTx(ctx, func(q *sqlc.Queries) error {
+		// Step 2: Lock settlement + target account rows for this transaction.
 		settlement, err := q.GetSettlementAccountForUpdate(ctx)
 		if err != nil {
 			return fmt.Errorf("settlement account not found: %w", err)
@@ -60,6 +62,7 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 			return ErrCurrencyMismatch
 		}
 
+		// Step 3: Use one transaction ID to tie both ledger legs together.
 		txID := uuid.New()
 
 		// 1. Credit user account (entry)
@@ -88,7 +91,7 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 			return err
 		}
 
-		// 3. Update balances
+		// 3. Update cached balances atomically in the same DB transaction.
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
 			Balance: amount.StringFixed(4),
 			ID:      accountID,
@@ -117,12 +120,14 @@ func (s *LedgerService) Deposit(ctx context.Context, accountID uuid.UUID, amount
 
 // Withdraw external money from user account
 func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amountStr string) error {
+	// Step 1: Validate amount before opening expensive DB work.
 	amount, err := validatePositiveAmount(amountStr)
 	if err != nil {
 		return err
 	}
 
 	return s.store.ExecTx(ctx, func(q *sqlc.Queries) error {
+		// Step 2: Lock settlement + user account to prevent concurrent balance races.
 		settlement, err := q.GetSettlementAccountForUpdate(ctx)
 		if err != nil {
 			return fmt.Errorf("settlement account not found: %w", err)
@@ -143,6 +148,7 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 		}
 
 		if balanceDec.LessThan(amount) {
+			// Business invariant: withdrawals cannot overdraw user funds.
 			return ErrInsufficientFunds
 		}
 
@@ -174,7 +180,7 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 			return err
 		}
 
-		// 3. Update balances
+		// 3. Update cached balances after entries are written.
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
 			Balance: amount.Neg().StringFixed(4),
 			ID:      accountID,
@@ -203,6 +209,7 @@ func (s *LedgerService) Withdraw(ctx context.Context, accountID uuid.UUID, amoun
 
 // Transfer between two user accounts
 func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, amountStr string) error {
+	// Step 1: Validate amount and reject self-transfers immediately.
 	amount, err := validatePositiveAmount(amountStr)
 	if err != nil {
 		return err
@@ -213,6 +220,7 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 	}
 
 	return s.store.ExecTx(ctx, func(q *sqlc.Queries) error {
+		// Step 2: Lock both accounts in the same transaction.
 		fromAcc, err := q.GetAccountForUpdate(ctx, fromID)
 		if err != nil {
 			return err
@@ -233,9 +241,11 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 		}
 
 		if fromBalance.LessThan(amount) {
+			// Sender must have enough balance to cover transfer amount.
 			return ErrInsufficientFunds
 		}
 
+		// Step 3: Single transaction ID links debit and credit entries.
 		txID := uuid.New()
 
 		// 1. Debit from
@@ -264,7 +274,7 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 			return err
 		}
 
-		// 3. Update balances
+		// 3. Update cached balances for both sides of the transfer.
 		err = q.UpdateAccountBalance(ctx, sqlc.UpdateAccountBalanceParams{
 			Balance: amount.Neg().StringFixed(4),
 			ID:      fromID,
@@ -294,11 +304,13 @@ func (s *LedgerService) Transfer(ctx context.Context, fromID, toID uuid.UUID, am
 
 // ReconcileAccount verifies stored balance == SUM(credits) - SUM(debits)
 func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUID) (bool, error) {
+	// Step 1: Read stored balance snapshot from accounts table.
 	account, err := s.store.GetAccount(ctx, accountID)
 	if err != nil {
 		return false, fmt.Errorf("account not found: %w", err)
 	}
 
+	// Step 2: Compute authoritative balance from immutable ledger entries.
 	calculatedStr, err := s.store.GetAccountBalance(ctx, accountID)
 	if err != nil {
 		return false, fmt.Errorf("failed to calculate balance: %w", err)
@@ -315,6 +327,7 @@ func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUI
 	}
 
 	if !stored.Equal(calculated) {
+		// Mismatch means denormalized cache drifted from ledger truth.
 		log.Error().
 			Str("account_id", accountID.String()).
 			Str("stored_balance", account.Balance).
@@ -334,6 +347,7 @@ func (s *LedgerService) ReconcileAccount(ctx context.Context, accountID uuid.UUI
 
 // validatePositiveAmount parses and validates that amount > 0
 func validatePositiveAmount(amountStr string) (decimal.Decimal, error) {
+	// Parse decimal as exact value; never use floating-point for money.
 	amt, err := decimal.NewFromString(amountStr)
 	if err != nil {
 		return decimal.Zero, ErrInvalidAmount

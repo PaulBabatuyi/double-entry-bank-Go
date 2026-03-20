@@ -11,12 +11,14 @@ import (
 func normalizeAmountInput(value interface{}) (string, error) {
 	switch v := value.(type) {
 	case string:
+		// Clients may send amount as a JSON string: {"amount":"100.00"}.
 		amount := strings.TrimSpace(v)
 		if amount == "" {
 			return "", errors.New("amount required")
 		}
 		return amount, nil
 	case json.Number:
+		// Preferred path when decoder uses UseNumber to avoid float precision loss.
 		amount := strings.TrimSpace(v.String())
 		if amount == "" {
 			return "", errors.New("amount required")
@@ -35,6 +37,7 @@ func decodeAmountFromBody(r *http.Request) (string, error) {
 		Amount interface{} `json:"amount"`
 	}
 
+	// UseNumber prevents automatic conversion into float64.
 	dec := json.NewDecoder(r.Body)
 	dec.UseNumber()
 	if err := dec.Decode(&input); err != nil {

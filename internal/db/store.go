@@ -39,14 +39,17 @@ func (store *Store) ExecTx(ctx context.Context, fn func(q *sqlc.Queries) error) 
 	const maxAttempts = 10
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
+		// Run one serializable transaction attempt.
 		lastErr = store.execTxOnce(ctx, fn)
 		if lastErr == nil {
 			return nil
 		}
 		if !isSerializationError(lastErr) {
+			// Non-retryable errors should bubble up immediately.
 			return lastErr
 		}
 		if attempt < maxAttempts-1 {
+			// Back off before retrying to reduce repeated contention.
 			if waitErr := sleepWithContext(ctx, retryWait(attempt)); waitErr != nil {
 				return waitErr
 			}
@@ -56,13 +59,16 @@ func (store *Store) ExecTx(ctx context.Context, fn func(q *sqlc.Queries) error) 
 }
 
 func (store *Store) execTxOnce(ctx context.Context, fn func(q *sqlc.Queries) error) error {
+	// Use serializable isolation to protect balance-changing flows from race anomalies.
 	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return err
 	}
 
+	// Bind sqlc queries to this transaction handle.
 	q := sqlc.New(tx)
 	if err := fn(q); err != nil {
+		// Always rollback on business/query failure.
 		if rbErr := tx.Rollback(); rbErr != nil {
 			return fmt.Errorf("tx failed: %w, rollback failed: %v", err, rbErr)
 		}
@@ -78,6 +84,7 @@ func (store *Store) execTxOnce(ctx context.Context, fn func(q *sqlc.Queries) err
 
 // retryWait returns a capped exponential backoff duration for the given attempt (0-based).
 func retryWait(attempt int) time.Duration {
+	// Exponential backoff: 50ms, 100ms, 200ms ... capped at 1s.
 	base := 50 * time.Millisecond
 	for i := 0; i < attempt; i++ {
 		base *= 2

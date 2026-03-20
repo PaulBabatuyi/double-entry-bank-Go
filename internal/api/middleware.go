@@ -16,12 +16,14 @@ var (
 
 // InitTokenAuthFromEnv initializes JWT auth using the JWT_SECRET environment variable.
 func InitTokenAuthFromEnv() error {
+	// Keep bootstrap simple: this function is called once from main().
 	secret := os.Getenv("JWT_SECRET")
 	return InitTokenAuth(secret)
 }
 
 // InitTokenAuth initializes JWT auth with the provided secret.
 func InitTokenAuth(secret string) error {
+	// Fail fast if JWT configuration is insecure or missing.
 	if secret == "" {
 		return errors.New("JWT_SECRET environment variable is required")
 	}
@@ -40,6 +42,7 @@ func GenerateToken(userID uuid.UUID) (string, error) {
 		return "", errors.New("token auth is not initialized")
 	}
 
+	// Include user identity and expiry in signed JWT claims.
 	claims := map[string]interface{}{
 		"user_id": userID.String(),
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),

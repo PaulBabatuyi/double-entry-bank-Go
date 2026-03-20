@@ -5,6 +5,7 @@ import "github.com/PaulBabatuyi/Double-Entry-Bank-Go/postgres/sqlc"
 func toAccountResponse(acc sqlc.Account) AccountResponse {
 	var ownerID *string
 	if acc.OwnerID.Valid {
+		// Convert nullable UUID into pointer so omitempty works in JSON output.
 		s := acc.OwnerID.UUID.String()
 		ownerID = &s
 	}
@@ -23,6 +24,7 @@ func toAccountResponse(acc sqlc.Account) AccountResponse {
 func toEntryResponse(entry sqlc.Entry) EntryResponse {
 	var description string
 	if entry.Description.Valid {
+		// Preserve optional descriptions only when present in DB rows.
 		description = entry.Description.String
 	}
 
@@ -41,6 +43,7 @@ func toEntryResponse(entry sqlc.Entry) EntryResponse {
 }
 
 func operationTypeToString(v interface{}) string {
+	// sqlc enum decoding can arrive as string or []byte depending on driver path.
 	switch t := v.(type) {
 	case nil:
 		return ""

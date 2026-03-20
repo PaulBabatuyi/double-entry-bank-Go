@@ -21,6 +21,7 @@ import (
 // For demonstration, these are placeholders. In a real repo, use test containers or a test DB.
 
 func setupTestLedger(t *testing.T) *LedgerService {
+	// Reuse env DB when available to match CI/runtime behavior.
 	dbURL := os.Getenv("DB_URL")
 	if dbURL == "" {
 		dbURL = "postgresql://root:secret@localhost:5432/simple_ledger?sslmode=disable"
@@ -35,11 +36,11 @@ func setupTestLedger(t *testing.T) *LedgerService {
 func createTestAccount(t *testing.T, ledger *LedgerService, balance string) uuid.UUID {
 	// Use a unique account name for each test run
 	accName := "Test Account " + uuid.New().String()
-	
-	// Get settlement account to match its currency
+
+	// Match settlement currency so deposit/transfer validations pass.
 	settlement, err := ledger.store.Queries.GetSettlementAccount(context.Background())
 	require.NoError(t, err)
-	
+
 	account, err := ledger.store.Queries.CreateAccount(context.Background(), sqlc.CreateAccountParams{
 		OwnerID:  uuid.NullUUID{Valid: false}, // No owner for test accounts
 		Name:     accName,
@@ -47,7 +48,7 @@ func createTestAccount(t *testing.T, ledger *LedgerService, balance string) uuid
 		IsSystem: false,
 	})
 	require.NoError(t, err)
-	// Fund the account if needed
+	// Optionally pre-fund account for withdrawal/transfer scenarios.
 	if balance != "0.00" && balance != "0" && balance != "" {
 		err = ledger.Deposit(context.Background(), account.ID, balance)
 		require.NoError(t, err)
@@ -62,6 +63,7 @@ func getAccountBalance(t *testing.T, ledger *LedgerService, accountID uuid.UUID)
 }
 
 func TestDeposit_Success(t *testing.T) {
+	// Deposit should increase account balance exactly by the amount.
 	ledger := setupTestLedger(t)
 	accountID := createTestAccount(t, ledger, "0.00")
 	err := ledger.Deposit(context.Background(), accountID, "100.00")
@@ -71,6 +73,7 @@ func TestDeposit_Success(t *testing.T) {
 }
 
 func TestWithdraw_InsufficientFunds(t *testing.T) {
+	// Withdrawal over balance should fail with business error.
 	ledger := setupTestLedger(t)
 	accountID := createTestAccount(t, ledger, "50.00")
 	err := ledger.Withdraw(context.Background(), accountID, "100.00")
@@ -79,6 +82,7 @@ func TestWithdraw_InsufficientFunds(t *testing.T) {
 }
 
 func TestConcurrentDeposits(t *testing.T) {
+	// Concurrent deposits should both commit without lost updates.
 	ledger := setupTestLedger(t)
 	accountID := createTestAccount(t, ledger, "0.00")
 	var wg sync.WaitGroup

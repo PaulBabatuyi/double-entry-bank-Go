@@ -43,6 +43,7 @@ func NewHandler(ledger *service.LedgerService, store *db.Store) *Handler {
 // @Failure      500     {object}  ErrorResponse
 // @Router       /register [post]
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Decode registration payload.
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -58,6 +59,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Hash password before persisting user credentials.
 	hashed, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to hash password")
@@ -65,6 +67,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 3: Persist user record and then mint JWT for immediate login.
 	user, err := h.store.CreateUser(r.Context(), sqlc.CreateUserParams{
 		Email:          input.Email,
 		HashedPassword: string(hashed),
@@ -103,6 +106,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 // @Failure      500     {object}  ErrorResponse
 // @Router       /login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Decode login payload.
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -113,6 +117,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Load user by email and compare bcrypt password hash.
 	user, err := h.store.GetUserByEmail(r.Context(), input.Email)
 	if err != nil {
 		log.Warn().Err(err).Str("email", input.Email).Msg("Login failed - user not found")
@@ -126,6 +131,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 3: Return a fresh JWT on successful authentication.
 	token, err := GenerateToken(user.ID)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", user.ID.String()).Msg("Failed to generate token")
@@ -151,6 +157,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts [post]
 // @Security     Bearer
 func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Authenticate caller from JWT claims.
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to extract JWT from context")
@@ -170,6 +177,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Decode request payload.
 	var input struct {
 		Name string `json:"name"`
 	}
@@ -178,6 +186,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 3: Create a user-owned account in default currency.
 	acc, err := h.store.CreateAccount(r.Context(), sqlc.CreateAccountParams{
 		OwnerID:  uuid.NullUUID{UUID: userID, Valid: true},
 		Name:     input.Name,
@@ -205,6 +214,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts [get]
 // @Security     Bearer
 func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Authenticate caller.
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to extract JWT from context")
@@ -224,6 +234,7 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Fetch only accounts owned by the authenticated user.
 	accounts, err := h.store.ListAccountsByOwner(r.Context(), uuid.NullUUID{UUID: userID, Valid: true})
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to list accounts")
@@ -253,6 +264,7 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 // @Router       /accounts/{id} [get]
 // @Security     Bearer
 func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Authenticate caller and parse target account ID.
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to extract JWT from context")
@@ -279,6 +291,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Enforce account ownership before returning account details.
 	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Account not found")
@@ -307,9 +320,12 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
 // @Failure      403     {object}  ErrorResponse
+// @Failure      404     {object}  ErrorResponse
+// @Failure      500     {object}  ErrorResponse
 // @Router       /accounts/{id}/deposit [post]
 // @Security     Bearer
 func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Authenticate caller and target account.
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to extract JWT from context")
@@ -335,6 +351,7 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Load account and enforce ownership authorization.
 	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Deposit failed - account not found")
@@ -347,6 +364,7 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 3: Decode amount and invoke service-level double-entry logic.
 	amount, err := decodeAmountFromBody(r)
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to decode deposit request")
@@ -381,9 +399,12 @@ func (h *Handler) Deposit(w http.ResponseWriter, r *http.Request) {
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
 // @Failure      403     {object}  ErrorResponse
+// @Failure      404     {object}  ErrorResponse
+// @Failure      500     {object}  ErrorResponse
 // @Router       /accounts/{id}/withdraw [post]
 // @Security     Bearer
 func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Authenticate caller and target account.
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to extract JWT from context")
@@ -409,6 +430,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Enforce ownership before attempting withdrawal.
 	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Withdrawal failed - account not found")
@@ -421,6 +443,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 3: Decode amount and delegate business checks to service layer.
 	amount, err := decodeAmountFromBody(r)
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to decode withdrawal request")
@@ -445,7 +468,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 
 // Transfer godoc
 // @Summary      Transfer money between accounts
-// @Description  Transfers fiat amount (mock) with double-entry ledger update
+// @Description  Transfers funds between accounts with atomic double-entry updates. The amount field accepts JSON number or string. from_id/to_id are preferred; from_account_id/to_account_id are supported as legacy aliases.
 // @Tags         accounts
 // @Accept       json
 // @Produce      json
@@ -454,12 +477,11 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
 // @Failure      403     {object}  ErrorResponse
+// @Failure      404     {object}  ErrorResponse
 // @Router       /transfers [post]
 // @Security     Bearer
-// Transfer handles money transfers between accounts.
-// @Summary Transfer between accounts
-// @Description Transfers funds between accounts. The `amount` field accepts either a JSON number or a JSON string. `from_id`/`to_id` are the preferred fields; `from_account_id`/`to_account_id` are supported as legacy aliases.
 func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Authenticate caller.
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to extract JWT from context")
@@ -479,6 +501,7 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Decode payload with support for current and legacy field names.
 	var input struct {
 		Amount        interface{} `json:"amount"`
 		FromID        string      `json:"from_id"`
@@ -494,6 +517,7 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalize IDs so handlers accept both new and legacy API clients.
 	fromIDRaw := strings.TrimSpace(input.FromID)
 	if fromIDRaw == "" {
 		fromIDRaw = strings.TrimSpace(input.FromAccountID)
@@ -516,6 +540,7 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 3: Validate IDs and amount format before business execution.
 	fromID, err := uuid.Parse(fromIDRaw)
 	if err != nil {
 		log.Warn().Err(err).Str("from_id", fromIDRaw).Msg("Invalid from_id UUID format")
@@ -542,6 +567,7 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 4: Authorize ownership on source account only.
 	fromAcc, err := h.store.GetAccount(r.Context(), fromID)
 	if err != nil {
 		log.Warn().Err(err).Str("from_id", fromID.String()).Msg("Transfer failed - from account not found")
@@ -554,6 +580,7 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 5: Run transfer through service layer (atomic double-entry write).
 	err = h.ledger.Transfer(r.Context(), fromID, toID, amount)
 	if err != nil {
 		log.Error().Err(err).Str("from_id", fromID.String()).Str("to_id", toID.String()).Str("amount", amount).Msg("Transfer failed")
@@ -577,10 +604,12 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 // @Failure      400     {object}  ErrorResponse
 // @Failure      401     {object}  ErrorResponse
 // @Failure      403     {object}  ErrorResponse
+// @Failure      404     {object}  ErrorResponse
 // @Failure      500     {object}  ErrorResponse
 // @Router       /accounts/{id}/entries [get]
 // @Security     Bearer
 func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Authenticate caller and parse account ID.
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to extract JWT from context")
@@ -606,6 +635,7 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Enforce account ownership.
 	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Get entries failed - account not found")
@@ -618,6 +648,7 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 3: Parse pagination with safe defaults and caps.
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 
@@ -637,6 +668,7 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 4: Fetch immutable ledger entries for the account.
 	entries, err := h.store.ListEntriesByAccount(r.Context(), sqlc.ListEntriesByAccountParams{
 		AccountID: accountID,
 		Limit:     int32(limit),
@@ -665,10 +697,13 @@ func (h *Handler) GetEntries(w http.ResponseWriter, r *http.Request) {
 // @Success      200  {array}   EntryResponse
 // @Failure      400  {object}  ErrorResponse
 // @Failure      401  {object}  ErrorResponse
+// @Failure      403  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Router       /transactions/{id} [get]
 // @Security     Bearer
 func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Authenticate caller and parse transaction ID.
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to extract JWT from context")
@@ -696,6 +731,7 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Load all entries belonging to the transaction.
 	entries, err := h.store.ListEntriesByTransaction(r.Context(), transactionID)
 	if err != nil {
 		log.Error().Err(err).Str("transaction_id", transactionID.String()).Msg("Failed to fetch transaction")
@@ -709,6 +745,7 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 3: Authorize if user owns at least one account in this transaction.
 	authorized := false
 	for _, entry := range entries {
 		acc, err := h.store.GetAccount(r.Context(), entry.AccountID)
@@ -748,10 +785,12 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {object}  ErrorResponse
 // @Failure      401  {object}  ErrorResponse
 // @Failure      403  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Router       /accounts/{id}/reconcile [get]
 // @Security     Bearer
 func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Authenticate caller and parse account ID.
 	_, claims, err := jwtauth.FromContext(r.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to extract JWT from context")
@@ -777,6 +816,7 @@ func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 2: Enforce ownership before reconciliation.
 	acc, err := h.store.GetAccount(r.Context(), accountID)
 	if err != nil {
 		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("Reconcile failed - account not found")
@@ -789,6 +829,7 @@ func (h *Handler) ReconcileAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Step 3: Compare stored balance with computed ledger balance.
 	matched, err := h.ledger.ReconcileAccount(r.Context(), accountID)
 	if err != nil {
 		log.Error().Err(err).Str("account_id", accountID.String()).Msg("Reconciliation failed")
