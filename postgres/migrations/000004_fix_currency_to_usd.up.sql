@@ -1,0 +1,2 @@
+-- Fix all currencies to USD (standardize from NGN/naira to USD)
+UPDATE accounts SET currency = 'USD' WHERE currency IS NULL OR currency != 'USD';

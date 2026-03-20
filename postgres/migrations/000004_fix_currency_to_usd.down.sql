@@ -1,0 +1,2 @@
+-- Rollback: This is a data-only migration, no schema changes to revert
+-- Historical currency values cannot be restored; review backups if needed

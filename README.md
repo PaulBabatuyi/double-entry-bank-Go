@@ -25,8 +25,7 @@ It demonstrates:
 
 This README is intentionally concise and implementation-focused.
 
-For the full narrative/tutorial version (for publishing), use the separate article file:
-- Long-form draft in this repo: FreeCodeCamp 
+For the full narrative/tutorial version, check FreeCodeCamp.
 
 ## Core Ledger Model
 
