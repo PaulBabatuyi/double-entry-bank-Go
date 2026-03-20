@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  internal_api.AccountResponse:
+  api.AccountResponse:
     properties:
       balance:
         type: string
@@ -15,10 +15,9 @@ definitions:
       name:
         type: string
       owner_id:
-        description: nullable
         type: string
     type: object
-  internal_api.EntryResponse:
+  api.EntryResponse:
     properties:
       account_id:
         type: string
@@ -37,17 +36,24 @@ definitions:
       transaction_id:
         type: string
     type: object
-  internal_api.ErrorResponse:
+  api.ErrorResponse:
     properties:
       error:
         type: string
     type: object
-  internal_api.MessageResponse:
+  api.MessageResponse:
     properties:
       message:
         type: string
     type: object
-  internal_api.RegisterResponse:
+  api.ReconcileResponse:
+    properties:
+      matched:
+        type: boolean
+      message:
+        type: string
+    type: object
+  api.RegisterResponse:
     properties:
       email:
         type: string
@@ -56,7 +62,7 @@ definitions:
       user_id:
         type: string
     type: object
-  internal_api.TokenResponse:
+  api.TokenResponse:
     properties:
       token:
         type: string
@@ -78,16 +84,16 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/internal_api.AccountResponse'
+              $ref: '#/definitions/api.AccountResponse'
             type: array
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
       security:
       - Bearer: []
       summary: List user accounts
@@ -113,19 +119,19 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api.AccountResponse'
+            $ref: '#/definitions/api.AccountResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
       security:
       - Bearer: []
       summary: Create a new account
@@ -146,19 +152,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api.AccountResponse'
+            $ref: '#/definitions/api.AccountResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
       security:
       - Bearer: []
       summary: Get account details
@@ -190,15 +200,27 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api.MessageResponse'
+            $ref: '#/definitions/api.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
       security:
       - Bearer: []
       summary: Deposit money into account
@@ -228,20 +250,28 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/internal_api.EntryResponse'
+              $ref: '#/definitions/api.EntryResponse'
             type: array
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
       security:
       - Bearer: []
       summary: Get account entries
@@ -263,30 +293,27 @@ paths:
         "200":
           description: OK
           schema:
-            properties:
-              matched:
-                type: boolean
-              message:
-                type: string
-            type: object
+            $ref: '#/definitions/api.ReconcileResponse'
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/api.ErrorResponse'
       security:
       - Bearer: []
       summary: Reconcile account balance
@@ -318,15 +345,27 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api.MessageResponse'
+            $ref: '#/definitions/api.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
       security:
       - Bearer: []
       summary: Withdraw money from account
@@ -355,19 +394,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api.TokenResponse'
+            $ref: '#/definitions/api.TokenResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
       summary: Login user
       tags:
       - auth
@@ -395,27 +434,73 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api.RegisterResponse'
+            $ref: '#/definitions/api.RegisterResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
       summary: Register a new user
       tags:
       - auth
+  /transactions/{id}:
+    get:
+      description: Returns both entries (debit and credit) for a complete transaction
+        view
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.EntryResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get transaction details
+      tags:
+      - accounts
   /transfers:
     post:
       consumes:
       - application/json
-      description: Transfers fiat amount (mock) with double-entry ledger update
+      description: Transfers funds between accounts with atomic double-entry updates.
+        The amount field accepts JSON number or string. from_id/to_id are preferred;
+        from_account_id/to_account_id are supported as legacy aliases.
       parameters:
       - description: Transfer details
         in: body
@@ -436,15 +521,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api.MessageResponse'
+            $ref: '#/definitions/api.MessageResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_api.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
       security:
       - Bearer: []
       summary: Transfer money between accounts
