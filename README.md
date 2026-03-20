@@ -6,302 +6,187 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/PaulBabatuyi/double-entry-bank-Go)](https://goreportcard.com/report/github.com/PaulBabatuyi/double-entry-bank-Go)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Production-grade demonstration of a **double-entry accounting ledger** backend in Go, simulating core banking operations with strong emphasis on financial correctness, traceability, and atomicity.
+Production-focused Go backend that models bank-style money movement using strict double-entry accounting.
 
-This project was built to showcase backend engineering skills relevant to fintech environments — particularly **ledger systems**, **payment processing**, **settlement**, **reliability under concurrency**, and **observability** — aligning closely with roles building scalable financial infrastructure (e.g., fiat deposits/withdrawals, internal ledgers, reconciliation, auditability).
+It demonstrates:
+- Atomic transactions with PostgreSQL
+- Concurrency safety with serializable isolation + retry
+- Ledger-based reconciliation
+- JWT auth + account-level authorization
+- API docs, health checks, and Dockerized deployment
 
-##  Live Demo
+## Live Demo
 
-- **Frontend (Render)**: https://double-entry-bank-go.onrender.com
-- **API Docs (Render)**: https://double-entry-bank-go.onrender.com/swagger/index.html  
+- Frontend (Render): https://double-entry-bank-go.onrender.com
+- API Docs: https://double-entry-bank-go.onrender.com/swagger/index.html
+- Health: https://double-entry-bank-go.onrender.com/health
 
-https://github.com/PaulBabatuyi/double-entry-bank-Go/blob/main/internal/public/swagger-Go-bank.png
+## Article vs README
 
-- **Health Check**: https://double-entry-bank-go.onrender.com/health
+This README is intentionally concise and implementation-focused.
 
-**Want to deploy your own?** See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
+For the full narrative/tutorial version (for publishing), use the separate article file:
+- Long-form draft in this repo: FreeCodeCamp 
 
+## Core Ledger Model
 
-### Features
+Each money movement writes balanced entries into the `entries` table:
+- deposit: credit user account, debit settlement account
+- withdrawal: debit user account, credit settlement account
+- transfer: debit source account, credit destination account
 
-- Strict **double-entry bookkeeping** (every transaction creates exactly two opposing entries: debit & credit)
-- Atomic operations via PostgreSQL transactions (deposits, withdrawals, transfers)
-- Immutable audit trail via `entries` table (source of truth)
-- Settlement account for external cash flows (deposit/withdrawal simulation)
-- Secure JWT-based authentication (register, login)
-- Structured logging with **Zerolog**
-- Health check endpoint (`/health`)
-- Interactive API documentation with **Swagger/OpenAPI** (`/swagger/index.html`)
-- Basic observability (request logging, health, future Prometheus metrics)
-- Fully containerized with Docker + golang-migrate
-- Comprehensive tests (unit, integration, race detection)
+Key constraints/behaviors implemented in code:
+- single-sided entry rows (debit xor credit)
+- account row locking (`FOR UPDATE`) during balance-changing operations
+- serializable transactions with automatic retry on SQLSTATE `40001`
+- reconciliation query computes `SUM(credit) - SUM(debit)` as source of truth
 
-### Relevance to Fintech Roles
+## Tech Stack
 
-This project directly demonstrates patterns used in real-world financial systems (e.g., Monzo, Nubank, Revolut-like services):
+- Go 1.24+
+- Router: go-chi/chi
+- Database: PostgreSQL 16
+- Query layer: sqlc
+- Auth: JWT (go-chi/jwtauth)
+- Logging: zerolog
+- API docs: swaggo + http-swagger
+- Testing: Go test + testify + race detector
+- Runtime: Docker + docker-compose
 
-- **Ledger & balance systems**: consistency, correctness, traceability of funds
-- **Payment lifecycles**: authorization, settlement, reconciliation, failure handling
-- **Scalable Go services**: high-throughput, low-latency, concurrent-safe operations
-- **Operational excellence**: monitoring (health/logs), incident readiness, end-to-end ownership
-- **Security & reliability**: JWT auth, input validation, atomic transactions, no races
+## API Endpoints
 
-Ideal for roles requiring strong production experience with Go in distributed/fintech systems.
+Public:
+- `POST /register`
+- `POST /login`
+- `GET /health`
+- `GET /swagger/index.html`
 
-### Tech Stack
+Protected (Bearer token required):
+- `POST /accounts`
+- `GET /accounts`
+- `GET /accounts/{id}`
+- `POST /accounts/{id}/deposit`
+- `POST /accounts/{id}/withdraw`
+- `POST /transfers`
+- `GET /accounts/{id}/entries`
+- `GET /accounts/{id}/reconcile`
+- `GET /transactions/{id}`
 
-- **Language**: Go 1.23+
-- **Web framework**: go-chi/chi (lightweight & performant router)
-- **Database**: PostgreSQL 16 + sqlc (type-safe queries)
-- **Migrations**: golang-migrate
-- **Auth**: JWT (HS256) with go-chi/jwtauth
-- **Logging**: Zerolog (structured, zero-allocation)
-- **Documentation**: swaggo/swag + http-swagger (OpenAPI/Swagger UI)
-- **Testing**: Go built-in + testify + race detector
-- **Containerization**: Docker + docker-compose
+## Project Structure
 
-### Folder Structure
+```text
 .
 ├── cmd/
-│   └── main.go                 # Server entrypoint
+│   └── main.go
 ├── internal/
 │   ├── api/
-│   │   ├── handler.go          # HTTP handlers + Swagger annotations
-│   │   └── middleware.go       # JWT helpers & token generation
 │   ├── db/
-│   │   └── store.go            # sqlc wrapper + transaction support
 │   └── service/
-│       └── ledger.go           # Core business logic (double-entry ops)
 ├── postgres/
-│   ├── migrations/             # golang-migrate SQL files
-│   └── queries/                # sqlc query files (.sql)
-│       ├── accounts.sql
-│       ├── entries.sql
-│       └── users.sql
-├── docs/                       # Generated Swagger docs (do not edit)
-├── .env                        # Secrets (git ignored)
-├── .env.example                # Template for env vars
+│   ├── migrations/
+│   ├── queries/
+│   └── sqlc/
+├── frontend/
+├── docs/
 ├── docker-compose.yml
-├── Dockerfile                  # For app container
-├── go.mod / go.sum
-├── Makefile                    # Common commands
+├── docker-entrypoint
+├── Dockerfile
+├── Makefile
 └── README.md
-text### Quick Start (Local Development)
+```
 
-1. **Prerequisites**
-   - Go 1.23+
-   - Docker & docker-compose
-   - golang-migrate CLI (`go install github.com/golang-migrate/migrate/v4/cmd/migrate@latest`)
-   - sqlc CLI (`go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest`)
-   - swag CLI (`go install github.com/swaggo/swag/cmd/swag@latest`)
+## Local Development
 
-2. **Clone & Setup**
-   ```bash
-   git clone https://github.com/PaulBabatuyi/double-entry-bank-Go.git
-   cd double-entry-bank-Go
-   cp .env.example .env
-   # Edit .env → set JWT_SECRET (generate strong one: openssl rand -base64 32)
+### Prerequisites
 
-Start PostgreSQL
-make postgres
+- Go 1.24+
+- Docker + docker compose
+- migrate CLI
+- sqlc CLI
+- swag CLI (only needed when regenerating docs)
 
-Run Migrations
-make migrate-up
+Install tools:
 
-Generate sqlc Code
-make sqlc
-
-Generate Swagger Docs
-swag init -g cmd/main.go --parseDependency --parseInternal
-
-Run Server
-make server
-# or: go run cmd/main.go
-
-6. **Access**
-   - **Demo Frontend**: http://localhost:8080  (Interactive web UI)
-   - **API base**: http://localhost:8080
-   - **Health check**: http://localhost:8080/health
-   - **Swagger UI**: http://localhost:8080/swagger/index.html
-   - Register: POST /register → get JWT
-   - Try endpoints (use Bearer token in Swagger "Authorize")
-
-### Demo Frontend
-
-The project includes a modern web interface for easy demonstration:
--  User registration & login
--  Account management (create multiple accounts)
--  Deposit & Withdraw operations
--  Transfer between accounts
--  Real-time transaction history
--  Responsive design (mobile & desktop)
-
-**Perfect for showcasing!**
-
-Access at: http://localhost:8080 after starting the server.
-- **Service layer**: Ledger operations (deposit, withdraw, transfer, reconcile)
-- **API layer**: HTTP handlers with authentication and authorization
-- **Database layer**: Store transactions and concurrency handling
-
-**Option 1: Using test script** (recommended)
 ```bash
-# Linux/Mac
+go install github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+go install github.com/swaggo/swag/cmd/swag@latest
+```
+
+### Run Locally
+
+```bash
+git clone https://github.com/PaulBabatuyi/double-entry-bank-Go.git
+cd double-entry-bank-Go
+cp .env.example .env
+# Set JWT_SECRET to at least 32 characters
+
+make postgres
+make migrate-up
+make sqlc
+make server
+```
+
+Open:
+- Frontend: http://localhost:8080
+- Swagger: http://localhost:8080/swagger/index.html
+- Health: http://localhost:8080/health
+
+## Testing
+
+Recommended:
+
+```bash
 chmod +x run_tests.sh
 ./run_tests.sh
-
-# Windows
-run_tests.bat
-
-# With coverage report
 ./run_tests.sh --coverage
 ```
 
-**Option 2: Manual testing**
+Manual:
+
 ```bash
-# Ensure DB is running
 make postgres
-
-# Run tests with race detection
 make test
-
-# Run tests with coverage
 make coverage
-
-# Run specific package tests
-go test -v -race ./internal/service
-go test -v -race ./internal/api
-go test -v -race ./internal/db
+make ci-test
 ```
 
-**Test Environment Variables:**
-- `TEST_DB_URL`: PostgreSQL connection string (default: `postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable`)
+Environment used by tests:
+- `TEST_DB_URL` (defaults to `postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable`)
 
-**Test Coverage:**
-- Service tests: Deposit, withdraw, transfer, reconcile, concurrent operations, edge cases
-- Handler tests: All endpoints with auth/authz, success and failure scenarios
-- Store tests: Transaction atomicity, rollback, isolation levels
-
-### CI/CD
-
-The project includes a comprehensive CI/CD pipeline using **GitHub Actions**.
-
-#### Workflows
-
-**1. CI Pipeline** (`.github/workflows/ci.yml`)
-- **Triggers**: Push to `main`/`develop`, Pull Requests
-- **Jobs**:
-  - **Lint**: Runs `golangci-lint` with 30+ linters
-  - **Test**: Runs all tests with PostgreSQL service, race detection, and coverage reporting
-  - **Build**: Compiles binary and uploads as artifact
-  - **Security**: Runs Gosec security scanner and uploads results to GitHub Security
-
-**2. Docker Build** (`.github/workflows/docker.yml`)
-- **Triggers**: Push to `main`, version tags (`v*.*.*`), releases
-- **Actions**:
-  - Builds multi-platform Docker images (amd64, arm64)
-  - Pushes to GitHub Container Registry (`ghcr.io`)
-  - Tags images appropriately (latest, version, sha)
-  - Generates build attestations for supply chain security
-
-**3. CodeQL Analysis** (`.github/workflows/codeql.yml`)
-- **Triggers**: Push, PR, scheduled weekly
-- **Actions**: Advanced security scanning using GitHub CodeQL
-
-**4. Release** (`.github/workflows/release.yml`)
-- **Triggers**: Version tags (`v*.*.*`)
-- **Actions**:
-  - Builds binaries for multiple platforms (Linux, macOS, Windows)
-  - Generates changelog from git commits
-  - Creates GitHub release with binaries attached
-
-**5. Dependabot** (`.github/dependabot.yml`)
-- Automatically updates Go modules, Docker images, and GitHub Actions
-- Opens PRs weekly for dependency updates
-
-#### CI/CD Status Badges
-
-Add these to the top of your README for visibility:
-
-```markdown
-[![CI](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/ci.yml/badge.svg)](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/ci.yml)
-[![Docker](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/docker.yml/badge.svg)](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/docker.yml)
-[![CodeQL](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/codeql.yml/badge.svg)](https://github.com/PaulBabatuyi/double-entry-bank-Go/actions/workflows/codeql.yml)
-```
-
-#### Running Docker Image from GHCR
+## Make Targets
 
 ```bash
-# Pull the latest image
-docker pull ghcr.io/paulbabatuyi/double-entry-bank-go:latest
-
-# Run with environment variables
-docker run -p 8080:8080 \
-  -e DB_URL="postgresql://user:pass@host:5432/db?sslmode=disable" \
-  -e JWT_SECRET="your-secret-key-min-32-chars" \
-  ghcr.io/paulbabatuyi/double-entry-bank-go:latest
-```
-
-#### Creating a Release
-
-```bash
-# Create and push a version tag
-git tag -a v1.0.0 -m "Release version 1.0.0"
-git push origin v1.0.0
-
-# This automatically:
-# 1. Triggers release workflow
-# 2. Builds binaries for all platforms
-# 3. Creates GitHub release with changelog
-# 4. Builds and pushes Docker image with version tag
-```
-
-#### Local Linting (matches CI)
-
-```bash
-# Run the same linters as CI
+make postgres
+make migrate-up
+make migrate-down
+make sqlc
+make server
+make test
+make coverage
 make lint
-
-# Or manually:
-golangci-lint run --timeout=5m
+make ci-test
+make docker-build
+make docker-up
+make docker-down
 ```
 
-### Quick Reference (Makefile)
+## Deployment
 
-```bash
-make postgres       # Start Postgres container
-make migrate-up     # Apply migrations
-make migrate-down   # Rollback last migration
-make sqlc           # Generate sqlc code
-make test           # Run tests with race detector
-make lint           # Run golangci-lint
-make coverage       # Generate & open coverage report
-make server         # Run the API server
-```
+Render deployment instructions are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
----
+Helper scripts:
+- `scripts/deploy-render.sh` (Linux/macOS)
+- `scripts/deploy-render.bat` (Windows)
 
-## 🚀 Deployment
+The container serves both API and static frontend from one service.
 
-### Production Deployment (Render)
+## Why This Project Exists
 
-Deploy the backend API and frontend together to **Render** (with PostgreSQL) for a simple production setup with automatic HTTPS and CI/CD.
+This repository is designed as a practical fintech-backend demonstration:
+- correctness under concurrency
+- auditable money movement
+- clear API boundaries
+- production-minded deployment shape
 
-📖 **Complete deployment guide**: [DEPLOYMENT.md](DEPLOYMENT.md)
-
-**Quick deployment:**
-
-```bash
-# 1. Deploy to Render
-./scripts/deploy-render.sh    # Linux/Mac
-# or
-scripts\deploy-render.bat      # Windows
-```
-
-**What you get:**
-- ✅ Backend API on Render with PostgreSQL database
-- ✅ Frontend served from the same Render service
-- ✅ Automatic HTTPS
-- ✅ Auto-deploy on git push
-- ✅ Free tier hosting (perfect for portfolio)
-
-After deployment, update the "Live Demo" section at the top of this README with your actual URLs!
+If you are a recruiter or reviewer, start with this README and Swagger; if you want the full technical narrative, use the article draft.
