@@ -17,7 +17,6 @@ COPY --from=builder /out/ledger /usr/local/bin/ledger
 COPY --from=builder /out/migrate /usr/local/bin/migrate
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /src/docs ./docs
-COPY --from=builder /src/frontend ./frontend
 COPY --from=builder /src/postgres/migrations ./postgres/migrations
 COPY docker-entrypoint /usr/local/bin/entrypoint
 

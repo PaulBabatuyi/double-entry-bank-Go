@@ -17,7 +17,8 @@ It demonstrates:
 
 ## Live Demo
 
-- Frontend (Render): https://double-entry-bank-go.onrender.com
+- Frontend: https://golangbank.app 
+- Frontend Repo: https://github.com/PaulBabatuyi/double-entry-bank
 - API Docs: https://double-entry-bank-go.onrender.com/swagger/index.html
 - Health: https://double-entry-bank-go.onrender.com/health
 
@@ -85,7 +86,6 @@ Protected (Bearer token required):
 │   ├── migrations/
 │   ├── queries/
 │   └── sqlc/
-├── frontend/
 ├── docs/
 ├── docker-compose.yml
 ├── docker-entrypoint
@@ -127,7 +127,7 @@ make server
 ```
 
 Open:
-- Frontend: http://localhost:8080
+- Frontend: https://golangbank.app
 - Swagger: http://localhost:8080/swagger/index.html
 - Health: http://localhost:8080/health
 
@@ -178,7 +178,7 @@ Helper scripts:
 - `scripts/deploy-render.sh` (Linux/macOS)
 - `scripts/deploy-render.bat` (Windows)
 
-The container serves both API and static frontend from one service.
+The container serves the backend API only. Frontend is deployed separately.
 
 ## Why This Project Exists
 

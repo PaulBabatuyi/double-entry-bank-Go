@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -42,50 +41,16 @@ func initLogger() {
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token
 
-// noDirFileSystem wraps http.FileSystem to disable directory listings.
-// Directories that contain an index.html are still served normally.
-type noDirFileSystem struct {
-	base http.FileSystem
-}
-
-func (fs noDirFileSystem) Open(name string) (http.File, error) {
-	f, err := fs.base.Open(name)
-	if err != nil {
-		return nil, err
-	}
-
-	stat, err := f.Stat()
-	if err != nil {
-		if closeErr := f.Close(); closeErr != nil {
-			return nil, errors.Join(err, closeErr)
-		}
-		return nil, err
-	}
-
-	if stat.IsDir() {
-		// Only permit directories that have an index.html (e.g. the root).
-		idx, idxErr := fs.base.Open(name + "/index.html")
-		if idxErr != nil {
-			if closeErr := f.Close(); closeErr != nil {
-				return nil, errors.Join(os.ErrNotExist, closeErr)
-			}
-			return nil, os.ErrNotExist
-		}
-		if closeErr := idx.Close(); closeErr != nil {
-			if fileCloseErr := f.Close(); fileCloseErr != nil {
-				return nil, errors.Join(closeErr, fileCloseErr)
-			}
-			return nil, closeErr
-		}
-	}
-
-	return f, nil
-}
-
 func parseAllowedOrigins() []string {
 	origins := os.Getenv("CORS_ALLOWED_ORIGINS")
 	if strings.TrimSpace(origins) == "" {
-		return []string{"http://localhost:8080", "http://127.0.0.1:8080"}
+		return []string{
+			"https://golangbank.app",
+			"http://localhost:3000",
+			"http://127.0.0.1:3000",
+			"http://localhost:5173",
+			"http://127.0.0.1:5173",
+		}
 	}
 
 	parts := strings.Split(origins, ",")
@@ -98,7 +63,13 @@ func parseAllowedOrigins() []string {
 	}
 
 	if len(allowed) == 0 {
-		return []string{"http://localhost:8080", "http://127.0.0.1:8080"}
+		return []string{
+			"https://golangbank.app",
+			"http://localhost:3000",
+			"http://127.0.0.1:3000",
+			"http://localhost:5173",
+			"http://127.0.0.1:5173",
+		}
 	}
 
 	return allowed
@@ -210,10 +181,6 @@ func main() {
 			next.ServeHTTP(w, r)
 		})
 	})
-
-	// Serve static frontend files without exposing directory listings
-	fileServer := http.FileServer(noDirFileSystem{http.Dir("./frontend")})
-	r.Handle("/*", fileServer)
 
 	// Public routes
 	r.Post("/register", h.Register)
