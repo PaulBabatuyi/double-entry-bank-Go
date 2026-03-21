@@ -19,7 +19,7 @@ It demonstrates:
 
 - Frontend: https://golangbank.app 
 - Frontend Repo: https://github.com/PaulBabatuyi/double-entry-bank
-- API Docs: https://double-entry-bank-go.onrender.com/swagger/index.html
+- API Docs: https://golangbank.app/swagger
 - Health: https://double-entry-bank-go.onrender.com/health
 
 ## Article vs README

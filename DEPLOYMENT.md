@@ -57,8 +57,8 @@ If you later host frontend from another domain, set `CORS_ALLOWED_ORIGINS` to in
 
 After deploy succeeds:
 
-- Health: `https://your-service-name.onrender.com/health`
-- Swagger: `https://your-service-name.onrender.com/swagger/index.html`
+- Health: `https://golangbank.app/health`
+- Swagger: `https://golangbank.app/swagger` (proxied through frontend)
 - Frontend: `https://golangbank.app`
 
 ## Notes
