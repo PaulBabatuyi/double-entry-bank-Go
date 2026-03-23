@@ -1,0 +1,27 @@
+services:
+  # Backend API
+  - type: web
+    name: double-entry-ledger-api
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_URL
+        fromDatabase:
+          name: ledger-db
+          property: connectionString
+    healthCheckPath: /health
+
+# PostgreSQL Database
+databases:
+  - name: ledger-db
+    plan: free
+    databaseName: simple_ledger
+    user: ledger_user
+    region: oregon
