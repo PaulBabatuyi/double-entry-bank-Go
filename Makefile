@@ -1,4 +1,7 @@
-.PHONY: postgres createdb migrate-up migrate-down sqlc test server lint coverage ci-test docker-build docker-up docker-down clean help
+.PHONY: postgres createdb migrate-up migrate-down migrate-up-local migrate-down-local migrate-up-docker migrate-down-docker sqlc test server lint coverage ci-test docker-build docker-up docker-down clean help
+
+DB_URL_DOCKER=postgresql://root:secret@127.0.0.1:5433/simple_ledger?sslmode=disable
+DB_URL_LOCAL=postgresql://root:secret@127.0.0.1:5432/simple_ledger?sslmode=disable
 
 postgres:
 	docker compose up -d
@@ -7,10 +10,22 @@ createdb:
 	docker compose exec db createdb --username=root --owner=root simple_ledger || true
 
 migrate-up:
-	migrate -path postgres/migrations/ -database "postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable" -verbose up
+	migrate -path postgres/migrations/ -database "$(DB_URL_DOCKER)" -verbose up
 
 migrate-down:
-	migrate -path postgres/migrations/ -database "postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable" -verbose down
+	migrate -path postgres/migrations/ -database "$(DB_URL_DOCKER)" -verbose down
+
+migrate-up-local:
+	migrate -path postgres/migrations/ -database "$(DB_URL_LOCAL)" -verbose up
+
+migrate-down-local:
+	migrate -path postgres/migrations/ -database "$(DB_URL_LOCAL)" -verbose down
+
+migrate-up-docker:
+	migrate -path postgres/migrations/ -database "$(DB_URL_DOCKER)" -verbose up
+
+migrate-down-docker:
+	migrate -path postgres/migrations/ -database "$(DB_URL_DOCKER)" -verbose down
 
 sqlc:
 	sqlc generate   
@@ -34,9 +49,9 @@ ci-test:
 	@docker compose up -d
 	@sleep 2
 	@echo "Running migrations..."
-	@migrate -path postgres/migrations/ -database "postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable" up
+	@migrate -path postgres/migrations/ -database "$(DB_URL_DOCKER)" up
 	@echo "Running tests with race detection and coverage..."
-	@TEST_DB_URL="postgresql://root:secret@localhost:5433/simple_ledger?sslmode=disable" go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+	@TEST_DB_URL="$(DB_URL_DOCKER)" go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 	@go tool cover -func=coverage.out
 
 # Build Docker image locally
@@ -65,6 +80,10 @@ help:
 	@echo "  createdb      - Create database"
 	@echo "  migrate-up    - Run database migrations"
 	@echo "  migrate-down  - Rollback last migration"
+	@echo "  migrate-up-local   - Run migrations against local PostgreSQL (5432)"
+	@echo "  migrate-down-local - Rollback migration against local PostgreSQL (5432)"
+	@echo "  migrate-up-docker  - Run migrations against Docker PostgreSQL (5433)"
+	@echo "  migrate-down-docker - Rollback migration against Docker PostgreSQL (5433)"
 	@echo "  sqlc          - Generate sqlc code"
 	@echo "  server        - Run API server"
 	@echo "  lint          - Run golangci-lint"
