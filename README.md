@@ -28,7 +28,7 @@ The frontend is intentionally minimal — Next.js Typescript, — so the focus s
 
 This README is intentionally concise and implementation-focused.
 
-For the full technical narrative and tutorial, read the FreeCodeCamp article: [How to Build a Bank Ledger in Golang with PostgreSQL using Double-Entry Accounting](https://www.freecodecamp.org) *(link will be updated once published)*
+For the full technical narrative and tutorial, read the FreeCodeCamp article: [How to Build a Bank Ledger in Golang with PostgreSQL using Double-Entry Accounting](https://www.freecodecamp.org/news/build-a-bank-ledger-in-go-with-postgresql-using-the-double-entry-accounting-principle/) 
 
 ## Core Ledger Model
 
