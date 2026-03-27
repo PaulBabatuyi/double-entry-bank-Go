@@ -15,9 +15,9 @@ It demonstrates:
 - JWT auth + account-level authorization
 - API docs, health checks, and Dockerized deployment
 
-The frontend is intentionally minimal — vanilla JS, no build step — so the focus stays on the Go backend. See the [frontend repo](https://github.com/PaulBabatuyi/double-entry-bank) for details.
+The frontend is intentionally minimal — Next.js Typescript, — so the focus stays on the Go backend. See the [frontend repo](https://github.com/PaulBabatuyi/double-entry-bank) for details.
 
-## Live Demo
+## Live Demo 
 
 - Frontend: https://golangbank.app
 - Frontend Repo: https://github.com/PaulBabatuyi/double-entry-bank
