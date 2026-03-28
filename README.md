@@ -24,6 +24,8 @@ The frontend is intentionally minimal — Next.js Typescript, — so the focus s
 - API Docs: https://golangbank.app/swagger
 - Health: https://golangbank.app/health
 
+Dont forget to star and fork this project repo
+
 ## Article vs README
 
 This README is intentionally concise and implementation-focused.
