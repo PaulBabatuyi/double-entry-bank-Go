@@ -2,9 +2,7 @@
 
 > **Full tutorial:** [How to Build a Bank Ledger in Golang with PostgreSQL using Double-Entry Accounting](https://www.freecodecamp.org/news/build-a-bank-ledger-in-go-with-postgresql-using-the-double-entry-accounting-principle/) on FreeCodeCamp
 
-This guide maps every concept in the codebase to where it lives, why it was built that way, and what you should read or do to understand it deeply. Work through it alongside the FreeCodeCamp article for the full picture.
-
----
+This guide maps the codebase to the article. Work through the FreeCodeCamp tutorial alongside the source code for the full picture.
 
 ## Who This Is For
 
@@ -13,8 +11,6 @@ This guide maps every concept in the codebase to where it lives, why it was buil
 - People preparing for backend or fintech interviews who want a real project to reference
 
 No prior fintech experience needed. Solid Go fundamentals and some SQL knowledge are enough to get started.
-
----
 
 ## Further Reading
 
@@ -25,8 +21,6 @@ No prior fintech experience needed. Solid Go fundamentals and some SQL knowledge
 - [golang-migrate](https://github.com/golang-migrate/migrate) — database migration tooling
 - [go-chi/jwtauth](https://github.com/go-chi/jwtauth) — JWT middleware used in this project
 - [Effective Go](https://golang.org/doc/effective_go) — Go idioms and conventions referenced in the code style guide
-
----
 
 ## Live Demo
 
