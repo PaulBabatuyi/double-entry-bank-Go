@@ -31,7 +31,7 @@ Dont forget to star and fork this project repo
 This README is intentionally concise and implementation-focused.
 
 For the full technical narrative and tutorial, read the FreeCodeCamp article: [How to Build a Bank Ledger in Golang with PostgreSQL using Double-Entry Accounting](https://www.freecodecamp.org/news/build-a-bank-ledger-in-go-with-postgresql-using-the-double-entry-accounting-principle/)  
-![freecodecamp](https://github.com/PaulBabatuyi/double-entry-bank-Go/issues/35#issue-4170157728)
+[freecodecamp](https://github.com/PaulBabatuyi/double-entry-bank-Go/issues/35#issue-4170157728)
 
 ## Core Ledger Model
 
@@ -45,7 +45,7 @@ Key constraints and behaviors implemented in code:
 - account row locking (`FOR UPDATE`) during balance-changing operations
 - serializable transactions with automatic retry on SQLSTATE `40001`
 - reconciliation query computes `SUM(credit) - SUM(debit)` as source of truth
-![Demo](https://github.com/PaulBabatuyi/double-entry-bank-Go/issues/35#issuecomment-4154509620)
+[Demo](https://github.com/PaulBabatuyi/double-entry-bank-Go/issues/35#issuecomment-4154509620)
 
 ## Tech Stack
 
@@ -77,7 +77,7 @@ Protected (Bearer token required):
 - `GET /accounts/{id}/entries`
 - `GET /accounts/{id}/reconcile`
 - `GET /transactions/{id}`
-![Backend API endpoint]https://github.com/PaulBabatuyi/double-entry-bank-Go/issues/35#issuecomment-4154510567
+[Backend API endpoint]https://github.com/PaulBabatuyi/double-entry-bank-Go/issues/35#issuecomment-4154510567
 ## Project Structure
 
 ```text
